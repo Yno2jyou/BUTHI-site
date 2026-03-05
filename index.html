@@ -359,12 +359,14 @@ function Styles({site}){
     .reading-back{background:none;border:none;cursor:pointer;color:var(--txt3);font-size:15px;padding:4px;transition:color .2s}.reading-back:hover{color:var(--accent)}
     .reading-crumb{font-size:11px;color:var(--txt3);letter-spacing:.1em}.reading-crumb b{color:var(--txt2);font-weight:400}
     .progress-rail{position:fixed;top:54px;left:0;right:0;height:2px;background:var(--border);z-index:500}.progress-fill{height:100%;background:var(--accent);transition:width .1s}
-    .reading-content{max-width:640px;margin:0 auto;padding:96px 36px 56px}
-    .reading-eyebrow{font-size:9px;letter-spacing:.44em;color:var(--accent);text-transform:uppercase;margin-bottom:26px}
-    .reading-ch-title{font-family:var(--serif);font-size:clamp(26px,5vw,44px);font-weight:300;color:var(--txt);line-height:1.15;margin-bottom:48px;padding-bottom:36px;border-bottom:1px solid var(--border)}
-    .reading-body{font-family:'Libre Baskerville',var(--body);font-size:17px;line-height:3;color:var(--txt2);letter-spacing:.05em}
-    .reading-body p{margin-bottom:0;text-indent:1.5em}.reading-body p:first-child{text-indent:0}
-    .reading-foot{display:flex;justify-content:space-between;align-items:center;max-width:640px;margin:0 auto;padding:56px 36px 90px;border-top:1px solid var(--border)}
+    /* ── カクヨム風 本文エリア ── */
+    .reading-wrap{background:color-mix(in srgb,var(--bg) 55%,#1a1a1a 45%);min-height:100vh}
+    .reading-content{max-width:680px;margin:0 auto;padding:88px 52px 60px}
+    .reading-eyebrow{font-size:9px;letter-spacing:.44em;color:var(--accent);text-transform:uppercase;margin-bottom:20px;text-align:center}
+    .reading-ch-title{font-family:'Noto Serif JP',serif;font-size:clamp(18px,3.5vw,24px);font-weight:500;color:var(--txt);line-height:1.9;margin-bottom:64px;padding-bottom:32px;border-bottom:1px solid var(--border);text-align:center;letter-spacing:.2em}
+    .reading-body{font-family:'Noto Serif JP',serif;font-size:16.5px;line-height:2.65;color:var(--txt);letter-spacing:.1em}
+    .reading-body p{margin-bottom:0;text-indent:1em}
+    .reading-foot{display:flex;justify-content:space-between;align-items:center;max-width:680px;margin:0 auto;padding:48px 52px 90px;border-top:1px solid var(--border)}
     .reading-foot-btn{background:none;border:1px solid var(--border);color:var(--txt2);font-family:var(--body);font-size:11px;letter-spacing:.18em;padding:10px 20px;cursor:pointer;transition:all .2s;text-transform:uppercase}
     .reading-foot-btn:hover{border-color:var(--accent);color:var(--accent)}.reading-foot-btn:disabled{opacity:.22;cursor:not-allowed}
     .reading-foot-pos{font-family:var(--serif);font-size:14px;color:var(--txt3)}
@@ -455,7 +457,7 @@ function Styles({site}){
     ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border-hi)}
     @media(max-width:680px){
       .nav{padding:0 16px}.hero{padding:100px 20px 60px}.section,.detail-body{padding-left:20px;padding-right:20px}
-      .detail-hero-content{padding:0 20px}.reading-content,.reading-foot{padding-left:20px;padding-right:20px}
+      .detail-hero-content{padding:0 20px}.reading-content{padding-left:20px;padding-right:20px;padding-top:72px}.reading-foot{padding-left:20px;padding-right:20px}
       .profile-wrap,.htg-wrap{padding:100px 20px 72px}.footer{padding:32px 20px}
       .admin-overlay{flex-direction:column}.admin-sidebar{width:100%;max-height:220px}
       .save-bar{left:0}.admin-main{padding:20px 16px 120px}.form-row{grid-template-columns:1fr}
@@ -663,6 +665,21 @@ function DetailPage({novel,onBack,onRead,onSendMessage}){
 }
 
 // ═══════════════ READING ═══════════════
+// 改行ルール：1改行→段落、空行（連続改行）→そのまま空白として表示
+function renderBody(content) {
+  const lines = content.split("\n");
+  const result = [];
+  lines.forEach((line, i) => {
+    if (line.trim() === "") {
+      // 空行 → 視覚的な空白行
+      result.push(<div key={`blank-${i}`} style={{height:"1.4em"}}/>);
+    } else {
+      result.push(<p key={`p-${i}`}>{line}</p>);
+    }
+  });
+  return result;
+}
+
 function ReadingPage({novel,chapterId,onBack,onChapter}){
   const ch=(novel.chapters||[]).find(c=>c.id===chapterId);
   const idx=(novel.chapters||[]).findIndex(c=>c.id===chapterId);
@@ -672,16 +689,16 @@ function ReadingPage({novel,chapterId,onBack,onChapter}){
   useEffect(()=>window.scrollTo({top:0,behavior:"smooth"}),[chapterId]);
   if(!ch)return null;
   return(
-    <div>
+    <div className="reading-wrap">
       <div className="reading-nav">
         <button className="reading-back" onClick={onBack}>←</button>
         <div className="reading-crumb"><b>{novel.title}</b>　／　{ch.title}</div>
       </div>
       <div className="progress-rail"><div className="progress-fill" style={{width:`${progress}%`}}/></div>
       <div className="reading-content">
-        <div className="reading-eyebrow rise d1">Chapter {String(idx+1).padStart(2,"0")} of {(novel.chapters||[]).length}</div>
+        <div className="reading-eyebrow rise d1">{String(idx+1).padStart(2,"0")} / {(novel.chapters||[]).length}</div>
         <h2 className="reading-ch-title rise d2">{ch.title}</h2>
-        <div className="reading-body rise d3">{ch.content.split("\n\n").filter(Boolean).map((p,i)=><p key={i}>{p}</p>)}</div>
+        <div className="reading-body rise d3">{renderBody(ch.content)}</div>
       </div>
       <div className="reading-foot">
         <button className="reading-foot-btn" disabled={!prev} onClick={()=>prev&&onChapter(prev.id)}>← 前の章</button>
