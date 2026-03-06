@@ -868,38 +868,37 @@ function ProfilePage({author,novels,onToWorks,site,onSendMessage}){
 
 // ═══════════════ WORK MAP ═══════════════
 function WorkMapSection({novels, accentColor}) {
-  const [status, setStatus] = useState("idle"); // idle | loading | done | error
+  const [status, setStatus] = useState("idle"); // idle | prompt | paste | done | error
   const [result, setResult] = useState(null);
   const [tooltip, setTooltip] = useState(null);
-  const [tab, setTab] = useState("map"); // map | recommend
+  const [tab, setTab] = useState("map");
+  const [jsonInput, setJsonInput] = useState("");
+  const [jsonError, setJsonError] = useState("");
+  const [copied, setCopied] = useState(false);
 
-  const analyze = async () => {
-    if(novels.length === 0) return;
-    setStatus("loading"); setResult(null);
-
-    // 全作品の本文を要約してプロンプトに含める
+  // プロンプト生成
+  const buildPrompt = () => {
     const worksText = novels.map(n => {
-      const content = (n.chapters||[]).map(c=>`【${c.title}】\n${(c.content||"").slice(0,1200)}`).join("\n\n");
+      const content = (n.chapters||[]).map(c=>`【${c.title}】\n${(c.content||"").slice(0,1500)}`).join("\n\n");
       return `■ 作品タイトル：${n.title}\nジャンル：${n.genre||""}\nタグ：${(n.tags||[]).join("、")}\nあらすじ：${n.description||""}\n本文抜粋：\n${content}`;
     }).join("\n\n---\n\n");
-
-    const prompt = `あなたは文学作品の分析者です。以下の小説作品群を熟読・分析し、JSONのみを返してください。
+    return `あなたは文学作品の分析者です。以下の小説作品群を熟読・分析し、JSONのみを返してください（説明文・コードブロック不要）。
 
 ## 分析対象作品
 ${worksText}
 
-## 出力形式（JSONのみ、説明文なし）
+## 出力形式（このJSONをそのまま返すこと）
 {
   "works": [
     {
       "title": "作品タイトル（元のタイトルをそのまま）",
-      "x": 0.65,  // 横軸：0=幻想・非日常、1=日常・リアル
-      "y": 0.28,  // 縦軸：0=希望・再生、1=絶望・喪失
-      "mood": "耽美・孤独",  // 作品の雰囲気を10字以内で
+      "x": 0.65,
+      "y": 0.28,
+      "mood": "耽美・孤独",
       "recommend": {
-        "reader": "深夜に孤独を抱える人",  // どんな読者に刺さるか15字以内
-        "reason": "主人公の内省が深く、静かな共鳴をもたらす",  // 理由30字以内
-        "similar_to": ["他の作品タイトル"]  // この作品と雰囲気が近い作品（最大2つ、なければ空配列）
+        "reader": "深夜に孤独を抱える人",
+        "reason": "主人公の内省が深く、静かな共鳴をもたらす",
+        "similar_to": ["他の作品タイトル"]
       }
     }
   ],
@@ -910,27 +909,27 @@ ${worksText}
     "y_bottom": "絶望・喪失"
   },
   "overall": "作品群全体の傾向を60字以内で"
-}`;
+}
 
+※ x軸：0=幻想・非日常、1=日常・リアル
+※ y軸：0=希望・再生、1=絶望・喪失
+※ 全作品をworksに含めること`;
+  };
+
+  const copyPrompt = () => {
+    navigator.clipboard.writeText(buildPrompt()).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); });
+  };
+
+  const applyJson = () => {
+    setJsonError("");
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          model:"claude-sonnet-4-20250514",
-          max_tokens:2000,
-          messages:[{role:"user", content:prompt}]
-        })
-      });
-      const data = await res.json();
-      const text = (data.content||[]).map(b=>b.text||"").join("");
-      const clean = text.replace(/```json|```/g,"").trim();
+      const clean = jsonInput.replace(/```json|```/g,"").trim();
       const parsed = JSON.parse(clean);
+      if(!parsed.works||!Array.isArray(parsed.works)) throw new Error("worksが見つかりません");
       setResult(parsed);
       setStatus("done");
     } catch(e) {
-      console.error(e);
-      setStatus("error");
+      setJsonError("JSONの形式が正しくありません：" + e.message);
     }
   };
 
@@ -945,29 +944,45 @@ ${worksText}
       </p>
 
       {status==="idle"&&(
-        <button className="btn btn-primary" style={{fontSize:14,padding:"12px 32px"}} onClick={analyze} disabled={novels.length===0}>
-          🔍 {novels.length}作品を分析してマップを生成
-        </button>
-      )}
-      {novels.length===0&&<p style={{fontSize:12,color:"var(--txt3)",marginTop:8}}>作品がありません。まず作品を追加してください。</p>}
-
-      {status==="loading"&&(
-        <div style={{padding:"60px 0",textAlign:"center"}}>
-          <div style={{fontFamily:"var(--serif)",fontSize:18,color:"var(--accent)",marginBottom:16}}>分析中…</div>
-          <div style={{fontSize:12,color:"var(--txt3)",letterSpacing:".1em",lineHeight:2}}>
-            全作品の本文を熟読しています<br/>しばらくお待ちください
+        <div>
+          <div style={{background:"color-mix(in srgb,var(--bg) 92%,#fff 8%)",border:"1px solid var(--border-hi)",borderRadius:3,padding:"18px 20px",marginBottom:20}}>
+            <div style={{fontSize:12,color:"var(--txt2)",lineHeight:2,letterSpacing:".04em",marginBottom:14}}>
+              <b style={{color:"var(--txt)"}}>使い方</b><br/>
+              ① 下のボタンで分析プロンプトをコピー<br/>
+              ② <a href="https://claude.ai" target="_blank" style={{color:"var(--accent)"}}>Claude.ai</a> や ChatGPT に貼り付けて送信<br/>
+              ③ 返ってきたJSONをこのページに貼り付けてマップ生成
+            </div>
+            <button className="btn btn-primary" style={{fontSize:13,padding:"10px 24px"}} onClick={()=>{ copyPrompt(); setStatus("prompt"); }} disabled={novels.length===0}>
+              {copied?"✓ コピーしました":"📋 分析プロンプトをコピー"}
+            </button>
+            {novels.length===0&&<p style={{fontSize:11,color:"var(--txt3)",marginTop:8}}>作品がありません</p>}
           </div>
-          <div style={{width:120,height:2,background:"var(--border)",margin:"20px auto",position:"relative",overflow:"hidden"}}>
-            <div style={{position:"absolute",inset:0,background:"var(--accent)",animation:"loadbar 1.2s ease infinite"}}/>
-          </div>
+          {result&&(
+            <button className="btn" style={{fontSize:12}} onClick={()=>setStatus("done")}>以前の結果を表示</button>
+          )}
         </div>
       )}
 
-      {status==="error"&&(
-        <div style={{padding:"40px 0",textAlign:"center",color:"#ef4444"}}>
-          <div style={{fontSize:16,marginBottom:8}}>⚠️ 分析に失敗しました</div>
-          <div style={{fontSize:12,color:"var(--txt3)",marginBottom:16}}>APIの接続を確認してください</div>
-          <button className="btn" onClick={()=>setStatus("idle")}>再試行</button>
+      {status==="prompt"&&(
+        <div>
+          <div style={{background:"color-mix(in srgb,var(--bg) 92%,#fff 8%)",border:"1px solid var(--accent)",borderRadius:3,padding:"16px 20px",marginBottom:20,fontSize:13,color:"var(--txt2)",lineHeight:2}}>
+            ✓ プロンプトをコピーしました<br/>
+            <span style={{fontSize:12,color:"var(--txt3)"}}>Claude.ai や ChatGPT に貼り付けて、返ってきたJSONをここに貼り付けてください</span>
+          </div>
+          <div className="form-group">
+            <label className="form-label">AIの返答（JSONをそのまま貼り付け）</label>
+            <textarea className="form-textarea" rows={10} value={jsonInput} onChange={e=>{setJsonInput(e.target.value);setJsonError("");}}
+              placeholder={'{\n  "works": [...],\n  "axis": {...},\n  "overall": "..."\n}'}
+              style={{fontFamily:"monospace",fontSize:12}}/>
+            {jsonError&&<div style={{fontSize:11,color:"#ef4444",marginTop:6}}>{jsonError}</div>}
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button className="btn btn-primary" onClick={applyJson} disabled={!jsonInput.trim()}>マップを生成</button>
+            <button className="btn" onClick={()=>{ copyPrompt(); setCopied(true); setTimeout(()=>setCopied(false),2000); }}>
+              {copied?"✓ コピー済み":"プロンプトを再コピー"}
+            </button>
+            <button className="btn" style={{marginLeft:"auto"}} onClick={()=>setStatus("idle")}>← 戻る</button>
+          </div>
         </div>
       )}
 
@@ -983,8 +998,7 @@ ${worksText}
                 {label}
               </button>
             ))}
-            <button onClick={()=>setStatus("idle")} style={{marginLeft:"auto",background:"none",border:"1px solid var(--border)",color:"var(--txt3)",fontFamily:"var(--body)",fontSize:11,padding:"4px 12px",cursor:"pointer",borderRadius:2,letterSpacing:".1em"}}>再生成</button>
-          </div>
+            <button onClick={()=>setStatus("idle")} style={{marginLeft:"auto",background:"none",border:"1px solid var(--border)",color:"var(--txt3)",fontFamily:"var(--body)",fontSize:11,padding:"4px 12px",cursor:"pointer",borderRadius:2,letterSpacing:".1em"}}>再生成</button>          </div>
 
           {/* 全体コメント */}
           <div style={{background:"color-mix(in srgb,var(--bg) 92%,#fff 8%)",border:"1px solid var(--border-hi)",borderRadius:3,padding:"14px 18px",marginBottom:24,fontSize:13,color:"var(--txt2)",letterSpacing:".06em",lineHeight:1.9}}>
