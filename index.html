@@ -1264,65 +1264,46 @@ function AdminPanel({store,onClose}){
 // ═══════════════ ROOT ═══════════════
 // ═══════════════ BG TEXT LAYER ═══════════════
 function BgTextLayer({novels}){
-  const spans = useMemo(()=>{
-    // 全章の本文から文節を抽出（句読点・改行で区切る）
+  const [cols, setCols] = React.useState([]);
+
+  React.useEffect(()=>{
+    if(!novels||novels.length===0) return;
     const sentences = [];
     novels.forEach(n=>{
       (n.chapters||[]).forEach(ch=>{
         const txt = (ch.content||"");
-        // 20〜45字の断片に分割
-        const parts = txt.split(/[。、
-
-]+/).map(s=>s.trim()).filter(s=>s.length>=10);
-        parts.forEach(p=>{
-          if(p.length>45) sentences.push(p.slice(0,45));
-          else sentences.push(p);
-        });
+        const parts = txt.split(/[\u3002\u3001\n\r]+/).map(s=>s.trim()).filter(s=>s.length>=10);
+        parts.forEach(p=>{ sentences.push(p.length>45?p.slice(0,45):p); });
       });
     });
-    if(sentences.length===0) return [];
-
-    // シャッフル
+    if(sentences.length===0) return;
     const shuffled=[...sentences].sort(()=>Math.random()-.5);
-
-    // 列を生成（画面幅に応じて）
-    const cols=[];
-    const colCount = Math.floor(window.innerWidth/52)+2;
+    const colCount = Math.floor(window.innerWidth/54)+2;
+    const result=[];
     for(let i=0;i<colCount;i++){
       const phrases=[];
-      // 各列に複数フレーズ
-      let total=0;
-      let idx=0;
-      while(total<20){
-        phrases.push(shuffled[(i*7+idx)%shuffled.length]);
-        total++;
-        idx++;
-      }
-      // 交互に上下スクロール
-      const goUp = i%2===0;
-      const dur = 28+Math.random()*22; // 28〜50秒
-      const delay = -(Math.random()*dur); // 最初からランダム位置
-      const left = 14+i*52; // px
-      const opacity = 0.028 + Math.random()*0.032; // 0.028〜0.06
-      const fontSize = 13+Math.floor(Math.random()*4); // 13〜16px
-      cols.push({phrases,goUp,dur,delay,left,opacity,fontSize,key:i});
+      for(let j=0;j<22;j++) phrases.push(shuffled[(i*7+j)%shuffled.length]);
+      result.push({
+        phrases, goUp:i%2===0,
+        dur:30+Math.random()*24,
+        delay:-(Math.random()*54),
+        left:12+i*54,
+        opacity:0.03+Math.random()*0.035,
+        fontSize:13+Math.floor(Math.random()*4),
+        key:i
+      });
     }
-    return cols;
-  },[novels]);
+    setCols(result);
+  }, [novels.map(n=>n.id).join(",")]);
 
-  if(spans.length===0) return null;
+  if(cols.length===0) return null;
   return(
     <div className="bg-text-layer" aria-hidden="true">
-      {spans.map(col=>(
+      {cols.map(col=>(
         <div key={col.key} className="bg-text-col"
-          style={{
-            left:col.left,
-            opacity:col.opacity,
-            fontSize:col.fontSize,
-            color:"var(--txt)",
+          style={{left:col.left,opacity:col.opacity,fontSize:col.fontSize,color:"var(--txt)",
             animation:`${col.goUp?"driftUp":"driftDown"} ${col.dur}s ${col.delay}s linear infinite`,
-            letterSpacing:".06em",
-          }}>
+            letterSpacing:".06em"}}>
           {col.phrases.map((p,j)=>(
             <span key={j} style={{display:"block",marginBottom:"1.8em"}}>{p}</span>
           ))}
