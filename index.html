@@ -866,6 +866,228 @@ function ProfilePage({author,novels,onToWorks,site,onSendMessage}){
   );
 }
 
+// ═══════════════ WORK MAP ═══════════════
+function WorkMapSection({novels, accentColor}) {
+  const [status, setStatus] = useState("idle"); // idle | loading | done | error
+  const [result, setResult] = useState(null);
+  const [tooltip, setTooltip] = useState(null);
+  const [tab, setTab] = useState("map"); // map | recommend
+
+  const analyze = async () => {
+    if(novels.length === 0) return;
+    setStatus("loading"); setResult(null);
+
+    // 全作品の本文を要約してプロンプトに含める
+    const worksText = novels.map(n => {
+      const content = (n.chapters||[]).map(c=>`【${c.title}】\n${(c.content||"").slice(0,1200)}`).join("\n\n");
+      return `■ 作品タイトル：${n.title}\nジャンル：${n.genre||""}\nタグ：${(n.tags||[]).join("、")}\nあらすじ：${n.description||""}\n本文抜粋：\n${content}`;
+    }).join("\n\n---\n\n");
+
+    const prompt = `あなたは文学作品の分析者です。以下の小説作品群を熟読・分析し、JSONのみを返してください。
+
+## 分析対象作品
+${worksText}
+
+## 出力形式（JSONのみ、説明文なし）
+{
+  "works": [
+    {
+      "title": "作品タイトル（元のタイトルをそのまま）",
+      "x": 0.65,  // 横軸：0=幻想・非日常、1=日常・リアル
+      "y": 0.28,  // 縦軸：0=希望・再生、1=絶望・喪失
+      "mood": "耽美・孤独",  // 作品の雰囲気を10字以内で
+      "recommend": {
+        "reader": "深夜に孤独を抱える人",  // どんな読者に刺さるか15字以内
+        "reason": "主人公の内省が深く、静かな共鳴をもたらす",  // 理由30字以内
+        "similar_to": ["他の作品タイトル"]  // この作品と雰囲気が近い作品（最大2つ、なければ空配列）
+      }
+    }
+  ],
+  "axis": {
+    "x_left": "幻想・非日常",
+    "x_right": "日常・リアル",
+    "y_top": "希望・再生",
+    "y_bottom": "絶望・喪失"
+  },
+  "overall": "作品群全体の傾向を60字以内で"
+}`;
+
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:2000,
+          messages:[{role:"user", content:prompt}]
+        })
+      });
+      const data = await res.json();
+      const text = (data.content||[]).map(b=>b.text||"").join("");
+      const clean = text.replace(/```json|```/g,"").trim();
+      const parsed = JSON.parse(clean);
+      setResult(parsed);
+      setStatus("done");
+    } catch(e) {
+      console.error(e);
+      setStatus("error");
+    }
+  };
+
+  const W=560, H=560;
+
+  return (
+    <div className="fadein">
+      <div className="admin-title">作品マップ・分析</div>
+      <p style={{fontSize:13,color:"var(--txt2)",lineHeight:1.9,marginBottom:24,letterSpacing:".04em"}}>
+        全作品の本文を熟読し、AIが自動で作品の座標・おすすめ読者・作品間の関係を分析します。<br/>
+        <span style={{fontSize:11,color:"var(--txt3)"}}>※ 分析にはAnthropicのAPIが使用されます。作品数・文字数によって数秒〜数十秒かかります。</span>
+      </p>
+
+      {status==="idle"&&(
+        <button className="btn btn-primary" style={{fontSize:14,padding:"12px 32px"}} onClick={analyze} disabled={novels.length===0}>
+          🔍 {novels.length}作品を分析してマップを生成
+        </button>
+      )}
+      {novels.length===0&&<p style={{fontSize:12,color:"var(--txt3)",marginTop:8}}>作品がありません。まず作品を追加してください。</p>}
+
+      {status==="loading"&&(
+        <div style={{padding:"60px 0",textAlign:"center"}}>
+          <div style={{fontFamily:"var(--serif)",fontSize:18,color:"var(--accent)",marginBottom:16}}>分析中…</div>
+          <div style={{fontSize:12,color:"var(--txt3)",letterSpacing:".1em",lineHeight:2}}>
+            全作品の本文を熟読しています<br/>しばらくお待ちください
+          </div>
+          <div style={{width:120,height:2,background:"var(--border)",margin:"20px auto",position:"relative",overflow:"hidden"}}>
+            <div style={{position:"absolute",inset:0,background:"var(--accent)",animation:"loadbar 1.2s ease infinite"}}/>
+          </div>
+        </div>
+      )}
+
+      {status==="error"&&(
+        <div style={{padding:"40px 0",textAlign:"center",color:"#ef4444"}}>
+          <div style={{fontSize:16,marginBottom:8}}>⚠️ 分析に失敗しました</div>
+          <div style={{fontSize:12,color:"var(--txt3)",marginBottom:16}}>APIの接続を確認してください</div>
+          <button className="btn" onClick={()=>setStatus("idle")}>再試行</button>
+        </div>
+      )}
+
+      {status==="done"&&result&&(
+        <>
+          {/* タブ */}
+          <div style={{display:"flex",gap:4,marginBottom:28,borderBottom:"1px solid var(--border)",paddingBottom:0}}>
+            {[["map","🗺️ 作品マップ"],["recommend","💡 おすすめ分析"]].map(([id,label])=>(
+              <button key={id} onClick={()=>setTab(id)}
+                style={{background:"none",border:"none",borderBottom:tab===id?`2px solid ${accentColor}`:"2px solid transparent",
+                  color:tab===id?"var(--txt)":"var(--txt3)",fontFamily:"var(--body)",fontSize:13,
+                  letterSpacing:".08em",padding:"8px 18px",cursor:"pointer",marginBottom:"-1px",transition:"color .2s"}}>
+                {label}
+              </button>
+            ))}
+            <button onClick={()=>setStatus("idle")} style={{marginLeft:"auto",background:"none",border:"1px solid var(--border)",color:"var(--txt3)",fontFamily:"var(--body)",fontSize:11,padding:"4px 12px",cursor:"pointer",borderRadius:2,letterSpacing:".1em"}}>再生成</button>
+          </div>
+
+          {/* 全体コメント */}
+          <div style={{background:"color-mix(in srgb,var(--bg) 92%,#fff 8%)",border:"1px solid var(--border-hi)",borderRadius:3,padding:"14px 18px",marginBottom:24,fontSize:13,color:"var(--txt2)",letterSpacing:".06em",lineHeight:1.9}}>
+            <span style={{fontSize:10,letterSpacing:".28em",color:"var(--accent)",textTransform:"uppercase",marginRight:10}}>総評</span>
+            {result.overall}
+          </div>
+
+          {/* マップタブ */}
+          {tab==="map"&&(
+            <div style={{position:"relative",width:"100%",maxWidth:W,margin:"0 auto"}}>
+              {/* 軸ラベル */}
+              <div style={{textAlign:"center",fontSize:10,letterSpacing:".22em",color:"#a8c4e8",marginBottom:8}}>{result.axis?.y_top||"希望・再生"}</div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{fontSize:10,letterSpacing:".18em",color:"var(--txt3)",writingMode:"vertical-rl",transform:"rotate(180deg)",flexShrink:0,height:W*0.85}}>{result.axis?.x_left||"幻想・非日常"}</div>
+                <div style={{position:"relative",flex:1,aspectRatio:"1/1",background:"color-mix(in srgb,var(--bg) 94%,#fff 6%)",border:"1px solid var(--border-hi)",borderRadius:4,overflow:"visible"}}>
+                  {/* グリッド */}
+                  <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}>
+                    <line x1="50%" y1="0" x2="50%" y2="100%" stroke="rgba(255,255,255,.08)" strokeWidth="1"/>
+                    <line x1="0" y1="50%" x2="100%" y2="50%" stroke="rgba(255,255,255,.08)" strokeWidth="1"/>
+                    {[25,75].map(p=>(
+                      <React.Fragment key={p}>
+                        <line x1={`${p}%`} y1="0" x2={`${p}%`} y2="100%" stroke="rgba(255,255,255,.04)" strokeWidth="1"/>
+                        <line x1="0" y1={`${p}%`} x2="100%" y2={`${p}%`} stroke="rgba(255,255,255,.04)" strokeWidth="1"/>
+                      </React.Fragment>
+                    ))}
+                  </svg>
+                  {/* 象限ラベル */}
+                  {[["3%","3%","幻想×希望"],["52%","3%","日常×希望"],["3%","52%","幻想×絶望"],["52%","52%","日常×絶望"]].map(([l,t,txt])=>(
+                    <div key={txt} style={{position:"absolute",left:l,top:t,fontSize:9,color:"rgba(255,255,255,.12)",letterSpacing:".12em"}}>{txt}</div>
+                  ))}
+                  {/* 作品ドット */}
+                  {(result.works||[]).map((w,i)=>{
+                    const dotColor = accentColor;
+                    return (
+                      <div key={i}
+                        style={{position:"absolute",left:`calc(${w.x*100}% - 7px)`,top:`calc(${w.y*100}% - 7px)`,cursor:"pointer",zIndex:10}}
+                        onMouseEnter={e=>setTooltip({...w,rect:e.currentTarget.getBoundingClientRect()})}
+                        onMouseLeave={()=>setTooltip(null)}>
+                        <div style={{width:14,height:14,borderRadius:"50%",background:dotColor,boxShadow:`0 0 12px ${dotColor}88`,border:"1px solid rgba(255,255,255,.3)",transition:"transform .15s"}}
+                          onMouseEnter={e=>e.currentTarget.style.transform="scale(1.5)"}
+                          onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}/>
+                        <div style={{position:"absolute",top:18,left:"50%",transform:"translateX(-50%)",whiteSpace:"nowrap",fontSize:10,color:"var(--txt2)",letterSpacing:".04em",textShadow:"0 1px 4px rgba(0,0,0,.8)",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>
+                          {w.title}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* ツールチップ */}
+                  {tooltip&&(
+                    <div style={{position:"fixed",left:tooltip.rect?.left,top:(tooltip.rect?.top||0)-120,
+                      background:"color-mix(in srgb,var(--bg) 88%,#fff 12%)",border:"1px solid var(--border-hi)",
+                      borderRadius:4,padding:"12px 14px",zIndex:9999,minWidth:200,maxWidth:260,
+                      boxShadow:"0 8px 32px rgba(0,0,0,.6)",pointerEvents:"none"}}>
+                      <div style={{fontFamily:"var(--serif)",fontSize:14,color:"var(--txt)",marginBottom:4}}>{tooltip.title}</div>
+                      <div style={{fontSize:10,color:"var(--accent)",letterSpacing:".1em",marginBottom:8}}>{tooltip.mood}</div>
+                      <div style={{fontSize:11,color:"var(--txt2)",lineHeight:1.7}}>{tooltip.recommend?.reason}</div>
+                    </div>
+                  )}
+                </div>
+                <div style={{fontSize:10,letterSpacing:".18em",color:"var(--txt3)",writingMode:"vertical-rl",flexShrink:0,height:W*0.85}}>{result.axis?.x_right||"日常・リアル"}</div>
+              </div>
+              <div style={{textAlign:"center",fontSize:10,letterSpacing:".22em",color:"#e8a8a8",marginTop:8}}>{result.axis?.y_bottom||"絶望・喪失"}</div>
+              <p style={{fontSize:11,color:"var(--txt3)",textAlign:"center",marginTop:12,letterSpacing:".06em"}}>ドットにカーソルを合わせると詳細が表示されます</p>
+            </div>
+          )}
+
+          {/* おすすめタブ */}
+          {tab==="recommend"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
+              {(result.works||[]).map((w,i)=>(
+                <div key={i} style={{background:"color-mix(in srgb,var(--bg) 92%,#fff 8%)",border:"1px solid var(--border-hi)",borderRadius:3,padding:"18px 20px"}}>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:14,marginBottom:12}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:accentColor,flexShrink:0,marginTop:6,boxShadow:`0 0 8px ${accentColor}88`}}/>
+                    <div style={{flex:1}}>
+                      <div style={{fontFamily:"var(--serif)",fontSize:16,color:"var(--txt)",letterSpacing:".06em",marginBottom:4}}>{w.title}</div>
+                      <div style={{fontSize:10,letterSpacing:".16em",color:"var(--accent)"}}>{w.mood}</div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:10,alignItems:"flex-start",background:"color-mix(in srgb,var(--bg) 96%,#fff 4%)",borderRadius:2,padding:"10px 14px",marginBottom:w.recommend?.similar_to?.length>0?12:0}}>
+                    <div style={{fontSize:11,color:"var(--txt3)",letterSpacing:".1em",flexShrink:0,marginTop:1}}>👤 読者</div>
+                    <div>
+                      <div style={{fontSize:13,color:"var(--txt2)",letterSpacing:".06em",marginBottom:4}}>{w.recommend?.reader}</div>
+                      <div style={{fontSize:12,color:"var(--txt3)",lineHeight:1.8,letterSpacing:".04em"}}>{w.recommend?.reason}</div>
+                    </div>
+                  </div>
+                  {(w.recommend?.similar_to||[]).length>0&&(
+                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                      <span style={{fontSize:10,color:"var(--txt3)",letterSpacing:".1em"}}>近い作品：</span>
+                      {(w.recommend.similar_to||[]).map((s,j)=>(
+                        <span key={j} style={{fontSize:10,border:"1px solid var(--border-hi)",color:"var(--txt2)",padding:"2px 9px",borderRadius:2,letterSpacing:".04em"}}>{s}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ═══════════════ ADMIN ═══════════════
 function AdminPanel({store,onClose}){
   const {site,setSite,author,setAuthor,novels,messages,deleteMessage,markRead,
@@ -908,6 +1130,7 @@ function AdminPanel({store,onClose}){
     {id:"messages",label:"受信メッセージ",icon:"✉️",badge:unread},
     {id:"theme",label:"デザイン・テーマ",icon:"🎨"},
     {id:"novels",label:"作品管理",icon:"📚"},
+    {id:"workmap",label:"作品マップ・分析",icon:"🗺️"},
   ];
 
   const [menuSelected, setMenuSelected] = useState(false);
@@ -1232,6 +1455,10 @@ function AdminPanel({store,onClose}){
             </div>
           );
         })()}
+        {sec==="workmap"&&(
+          <WorkMapSection novels={novels} accentColor={site.theme?.accent||"#c8a86a"}/>
+        )}
+
       </div>
 
       <div className="save-bar"><div className="save-status" style={{color:"var(--txt2)"}}>{saving?"⌛ 保存中…":saved?"✓ 変更を保存しました":"データはFirestoreに自動保存されます"}</div></div>
