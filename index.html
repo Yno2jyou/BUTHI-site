@@ -259,7 +259,11 @@ function groupByYM(items, getISO) {
     if(!map.has(ym)) map.set(ym,[]);
     map.get(ym).push(item);
   });
-  return [...map.entries()];
+  return [...map.entries()].sort(([a],[b])=>{
+    if(a==="不明") return 1; if(b==="不明") return -1;
+    const parse=s=>{ const m=s.match(/(\d+)年(\d+)月/); return m?new Date(+m[1],+m[2]-1):new Date(0); };
+    return parse(a)-parse(b);
+  });
 }
 
 const THEMES=[
