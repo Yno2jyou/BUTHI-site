@@ -1279,23 +1279,28 @@ function BgTextLayer({novels}){
     if(sentences.length===0) return;
     const shuffled=[...sentences].sort(()=>Math.random()-.5);
 
-    // 列単位ではなく、各文を独立した要素として配置
+    // 文字サイズ12px、縦書き1文字幅≒14px
+    // 各スロットに1文だけ配置してX方向の重なりを完全排除
+    const CHAR_W = 16;        // 1列分の幅(px)：文字+余白
+    const GAP    = 28;        // 列間の最低余白(px)
+    const SLOT_W = CHAR_W + GAP; // 1スロット = 44px
     const W = window.innerWidth;
-    const result=[];
-    const count = Math.min(28, shuffled.length); // 最大28文
-    for(let i=0;i<count;i++){
-      result.push({
-        text: shuffled[i],
-        // 横位置：左右にランダム散在（列に揃わないよう）
-        left: 4 + Math.random()*88, // vw単位
-        // 上下どちらかからスタート
-        goUp: Math.random()>.5,
-        dur: 40+Math.random()*30,           // 40〜70秒
-        delay: -(Math.random()*70),         // バラバラのタイミング
-        opacity: 0.04+Math.random()*0.03,
-        key: i
-      });
-    }
+    const maxSlots = Math.floor(W / SLOT_W);
+    const count = Math.min(maxSlots, 22, shuffled.length);
+
+    // スロットをシャッフルして均等散在
+    const slots = Array.from({length:maxSlots},(_,i)=>i).sort(()=>Math.random()-.5).slice(0,count);
+
+    const result = slots.map((slot, i)=>({
+      text: shuffled[i],
+      left: slot * SLOT_W + 8,   // px
+      goUp: Math.random()>.5,
+      dur:  44 + Math.random()*26,
+      delay: -(Math.random()*70),
+      opacity: 0.042 + Math.random()*0.028,
+      key: i
+    }));
+
     setItems(result);
   }, [novels.map(n=>n.id).join(",")]);
 
@@ -1306,7 +1311,7 @@ function BgTextLayer({novels}){
         <div key={item.key}
           style={{
             position:"absolute",
-            left:`${item.left}vw`,
+            left: item.left,
             top:0,
             opacity:item.opacity,
             fontSize:"12px",
