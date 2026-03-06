@@ -1272,28 +1272,26 @@ function BgTextLayer({novels}){
     novels.forEach(n=>{
       (n.chapters||[]).forEach(ch=>{
         const txt = (ch.content||"");
-        const parts = txt.split(/[\u3002\u3001\n\r]+/).map(s=>s.trim()).filter(s=>s.length>=8&&s.length<=30);
+        // 句点で区切って「文」として抽出（読点はそのまま含む）
+        const parts = txt.split(/(?<=。)/).map(s=>s.trim()).filter(s=>s.length>=8&&s.length<=36);
         parts.forEach(p=>{ sentences.push(p); });
       });
     });
     if(sentences.length===0) return;
     const shuffled=[...sentences].sort(()=>Math.random()-.5);
 
-    // 列幅を広めにとって重なりを防ぐ
-    const COL_W = 88; // px between columns
+    const COL_W = 110; // 列間隔を広く
     const colCount = Math.floor(window.innerWidth / COL_W);
     const result=[];
     for(let i=0;i<colCount;i++){
       const phrases=[];
-      // 1列あたり8〜10フレーズのみ（隙間を多く）
-      for(let j=0;j<9;j++) phrases.push(shuffled[(i*11+j)%shuffled.length]);
+      for(let j=0;j<18;j++) phrases.push(shuffled[(i*13+j)%shuffled.length]);
       result.push({
         phrases, goUp:i%2===0,
-        dur:38+Math.random()*20,          // 38〜58秒（ゆっくり）
-        delay:-(Math.random()*58),
-        left:24+i*COL_W,
-        opacity:0.04+Math.random()*0.03,  // 0.04〜0.07
-        fontSize:12,                       // 固定サイズで揃える
+        dur:44+Math.random()*20,
+        delay:-(Math.random()*64),
+        left:20+i*COL_W,
+        opacity:0.042+Math.random()*0.025,
         key:i
       });
     }
@@ -1305,13 +1303,18 @@ function BgTextLayer({novels}){
     <div className="bg-text-layer" aria-hidden="true">
       {cols.map(col=>(
         <div key={col.key} className="bg-text-col"
-          style={{left:col.left,opacity:col.opacity,fontSize:col.fontSize,color:"var(--txt)",
+          style={{
+            left:col.left,
+            opacity:col.opacity,
+            fontSize:"12px",
+            color:"var(--txt)",
             animation:`${col.goUp?"driftUp":"driftDown"} ${col.dur}s ${col.delay}s linear infinite`,
             letterSpacing:".05em",
-            lineHeight:"3.2em"   // 行間を広げてフレーズ間に余白
+            lineHeight:"1.9em",
+            width:"1.4em",       // 縦書き列幅を明示して隣列に侵食しない
           }}>
           {col.phrases.map((p,j)=>(
-            <span key={j} style={{display:"block",marginBottom:"3em"}}>{p}</span>
+            <span key={j} style={{display:"block",marginBottom:"4em"}}>{p}</span>
           ))}
         </div>
       ))}
