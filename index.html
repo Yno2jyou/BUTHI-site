@@ -470,7 +470,7 @@ function Styles({site}){
     /* 文字数統計 */
     .wc-stat{font-family:var(--serif);font-size:11px;color:var(--txt3);letter-spacing:.1em;margin-left:4px}
     .wc-stat b{color:var(--accent);font-weight:400}
-    /* ANIMATIONS */
+    .mobile-back-btn{display:none}
     @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
     .rise{animation:rise .6s ease forwards;opacity:0}.d1{animation-delay:.04s}.d2{animation-delay:.14s}.d3{animation-delay:.26s}.d4{animation-delay:.38s}
     @keyframes fadein{from{opacity:0}to{opacity:1}}.fadein{animation:fadein .3s ease forwards}
@@ -479,8 +479,16 @@ function Styles({site}){
       .nav{padding:0 16px}.hero{padding:100px 20px 60px}.section,.detail-body{padding-left:20px;padding-right:20px}
       .detail-hero-content{padding:0 20px}.reading-content{padding-left:20px;padding-right:20px;padding-top:72px}.reading-foot{padding-left:20px;padding-right:20px}
       .profile-wrap,.htg-wrap{padding:100px 20px 72px}.footer{padding:32px 20px}
-      .admin-overlay{flex-direction:column}.admin-sidebar{width:100%;max-height:220px}
-      .save-bar{left:0}.admin-main{padding:20px 16px 120px}.form-row{grid-template-columns:1fr}
+      .admin-overlay{flex-direction:column}
+      /* モバイル：メニュー選択前はサイドバーのみ、選択後はメインのみ */
+      .admin-sidebar{width:100%;max-height:none;height:100%}
+      .admin-main{display:none;padding:20px 16px 120px}
+      .admin-overlay.menu-selected .admin-sidebar{display:none}
+      .admin-overlay.menu-selected .admin-main{display:block}
+      .save-bar{left:0}
+      .form-row{grid-template-columns:1fr}
+      /* モバイル戻るボタン */
+      .mobile-back-btn{display:flex;align-items:center;gap:8px;background:none;border:none;color:var(--accent);font-family:var(--body);font-size:13px;letter-spacing:.08em;padding:0 0 20px;cursor:pointer}
     }
   `);
 }
@@ -898,8 +906,17 @@ function AdminPanel({store,onClose}){
     {id:"novels",label:"作品管理",icon:"📚"},
   ];
 
+  const [menuSelected, setMenuSelected] = useState(false);
+
+  // スマホ：メニュー項目を選択したら全画面コンテンツ表示
+  const selectSec = (id) => {
+    setSec(id); setEditNid(null); setEditCh(null);
+    setMenuSelected(true);
+  };
+  const goBackToMenu = () => setMenuSelected(false);
+
   return(
-    <div className="admin-overlay fadein">
+    <div className={`admin-overlay fadein${menuSelected?" menu-selected":""}`}>
       <div className="admin-sidebar">
         <div className="admin-logo"><div className="admin-logo-txt">管理パネル</div><div className="admin-logo-sub">Admin Panel</div></div>
         <nav className="admin-nav">
@@ -907,7 +924,7 @@ function AdminPanel({store,onClose}){
             <span className="admin-nav-label">設定</span>
             {sideItems.map(item=>(
               <button key={item.id} className={`admin-nav-item ${sec===item.id?"active":""}`}
-                onClick={()=>{ setSec(item.id); setEditNid(null); setEditCh(null); }}>
+                onClick={()=>selectSec(item.id)}>
                 {item.icon} {item.label}{item.badge>0&&<span className="badge">{item.badge}</span>}
               </button>
             ))}
@@ -915,7 +932,7 @@ function AdminPanel({store,onClose}){
           {editNid&&(
             <div className="admin-nav-group">
               <span className="admin-nav-label">編集中</span>
-              <button className={`admin-nav-item ${sec==="novel_edit"?"active":""}`} onClick={()=>setSec("novel_edit")}>
+              <button className={`admin-nav-item ${sec==="novel_edit"?"active":""}`} onClick={()=>{ setSec("novel_edit"); setMenuSelected(true); }}>
                 📝 {eNov?.title||"作品"}
               </button>
             </div>
@@ -925,6 +942,8 @@ function AdminPanel({store,onClose}){
       </div>
 
       <div className="admin-main">
+        {/* モバイル：コンテンツ画面上部に「← メニューへ」ボタン */}
+        <button className="mobile-back-btn" onClick={goBackToMenu}>← メニューへ</button>
 
         {sec==="site"&&(
           <div className="fadein">
@@ -1100,13 +1119,13 @@ function AdminPanel({store,onClose}){
                   <div className="arow-actions">
                     <button className={`icon-btn ${n.pinned?"primary":""}`} title={n.pinned?"固定解除":"先頭に固定"} onClick={()=>updateNovel(n.id,{pinned:!n.pinned})}>{n.pinned?"📌":"📌"}</button>
                     <button className={`icon-btn ${n.locked?"danger":""}`} title={n.locked?"ロック解除":"削除ロック"} onClick={()=>updateNovel(n.id,{locked:!n.locked})}>{n.locked?"🔒":"🔓"}</button>
-                    <button className="icon-btn primary" onClick={()=>{ setEditNid(n.id); setSec("novel_edit"); }}>✏️ 編集</button>
+                    <button className="icon-btn primary" onClick={()=>{ setEditNid(n.id); setSec("novel_edit"); setMenuSelected(true); }}>✏️ 編集</button>
                     <button className="icon-btn danger" disabled={!!n.locked} style={{opacity:n.locked?.3:1,cursor:n.locked?"not-allowed":"pointer"}} onClick={()=>!n.locked&&setDelConfirm({type:"novel",id:n.id,label:n.title})}>🗑</button>
                   </div>
                 </div>
               ))}
             </div>
-            <button className="btn btn-primary" onClick={async()=>{ const id=await addNovel(); setEditNid(id); setSec("novel_edit"); }}>＋ 新しい作品を追加</button>
+            <button className="btn btn-primary" onClick={async()=>{ const id=await addNovel(); setEditNid(id); setSec("novel_edit"); setMenuSelected(true); }}>＋ 新しい作品を追加</button>
           </div>
         )}
 
@@ -1162,7 +1181,7 @@ function AdminPanel({store,onClose}){
             <div style={{marginTop:32,paddingTop:24,borderTop:"1px solid var(--border)"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
                 <span className="form-label" style={{margin:0}}>章一覧 ({(eNov.chapters||[]).length}章)</span>
-                <button className="btn btn-primary" style={{padding:"7px 16px",fontSize:11}} onClick={async()=>{ const id=await addChapter(eNov.id); setEditCh({nid:eNov.id,cid:id}); setSec("chapter_edit"); }}>＋ 章を追加</button>
+                <button className="btn btn-primary" style={{padding:"7px 16px",fontSize:11}} onClick={async()=>{ const id=await addChapter(eNov.id); setEditCh({nid:eNov.id,cid:id}); setSec("chapter_edit"); setMenuSelected(true); }}>＋ 章を追加</button>
               </div>
               <div className="ch-list">
                 {(eNov.chapters||[]).length===0&&<div style={{padding:"16px",color:"var(--txt3)",fontSize:12}}>章がありません</div>}
@@ -1170,7 +1189,7 @@ function AdminPanel({store,onClose}){
                   <div key={ch.id} className="ch-row">
                     <span className="ch-num">0{i+1}</span><span className="ch-txt">{ch.title}</span>
                     <div style={{display:"flex",gap:6,marginLeft:"auto"}}>
-                      <button className="icon-btn primary" onClick={()=>{ setEditCh({nid:eNov.id,cid:ch.id}); setSec("chapter_edit"); }}>✏️</button>
+                      <button className="icon-btn primary" onClick={()=>{ setEditCh({nid:eNov.id,cid:ch.id}); setSec("chapter_edit"); setMenuSelected(true); }}>✏️</button>
                       <button className="icon-btn danger" onClick={()=>setDelConfirm({type:"chapter",nid:eNov.id,id:ch.id,label:ch.title})}>🗑</button>
                     </div>
                   </div>
@@ -1221,7 +1240,7 @@ function AdminPanel({store,onClose}){
             <div className="modal-actions">
               <button className="btn" onClick={()=>setDelConfirm(null)}>キャンセル</button>
               <button className="btn btn-danger" onClick={()=>{
-                if(delConfirm.type==="novel"){ deleteNovel(delConfirm.id); setSec("novels"); setEditNid(null); }
+                if(delConfirm.type==="novel"){ deleteNovel(delConfirm.id); setSec("novels"); setEditNid(null); setMenuSelected(true); }
                 if(delConfirm.type==="chapter"){ deleteChapter(delConfirm.nid,delConfirm.id); setSec("novel_edit"); }
                 setDelConfirm(null);
               }}>削除する</button>
