@@ -174,7 +174,7 @@ function useStore() {
       title:"新しい作品", subtitle:"", author:author.name, genre:"小説",
       tags:[], description:"", color1:"#0a0a14", color2:"#1a1a2e", accent:"#c8a86a",
       wordCount:"", updated: new Date().toISOString().slice(0,7),
-      chapters:[], createdAt: now,
+      chapters:[], createdAt: now, pinned:false, locked:false,
     };
     const ref = await db.collection("novels").add(data);
     return ref.id;
@@ -450,6 +450,21 @@ function Styles({site}){
     .msg-hdr{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
     .msg-name{font-size:13px;color:var(--txt);font-weight:500}.msg-target{font-size:10px;letter-spacing:.18em;color:var(--accent);text-transform:uppercase;border:1px solid var(--accent-glow);padding:2px 8px;border-radius:1px}.msg-date{font-size:10px;color:var(--txt3);margin-left:auto}.msg-body{font-size:13px;line-height:1.9;color:var(--txt2);white-space:pre-wrap}.msg-acts{display:flex;gap:6px;margin-top:10px}
     .badge{background:var(--accent);color:var(--bg);font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;margin-left:6px}
+    /* ピン・ロック */
+    .novel-badge-pin{font-size:10px;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);padding:1px 7px;border-radius:2px;letter-spacing:.08em;flex-shrink:0}
+    .novel-badge-lock{font-size:10px;background:rgba(239,68,68,.12);border:1px solid #ef4444;color:#ef4444;padding:1px 7px;border-radius:2px;letter-spacing:.08em;flex-shrink:0}
+    .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+    .toggle-label{font-size:13px;color:var(--txt2);letter-spacing:.04em}
+    .toggle-desc{font-size:11px;color:var(--txt3);margin-top:2px}
+    .toggle-switch{position:relative;width:42px;height:24px;flex-shrink:0}
+    .toggle-switch input{opacity:0;width:0;height:0}
+    .toggle-slider{position:absolute;inset:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:background .2s,border-color .2s}
+    .toggle-slider::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:var(--txt3);border-radius:50%;transition:transform .2s,background .2s}
+    .toggle-switch input:checked+.toggle-slider{background:var(--accent-dim);border-color:var(--accent)}
+    .toggle-switch input:checked+.toggle-slider::before{transform:translateX(18px);background:var(--accent)}
+    /* 文字数統計 */
+    .wc-stat{font-family:var(--serif);font-size:11px;color:var(--txt3);letter-spacing:.1em;margin-left:4px}
+    .wc-stat b{color:var(--accent);font-weight:400}
     /* ANIMATIONS */
     @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
     .rise{animation:rise .6s ease forwards;opacity:0}.d1{animation-delay:.04s}.d2{animation-delay:.14s}.d3{animation-delay:.26s}.d4{animation-delay:.38s}
@@ -547,16 +562,36 @@ function Nav({page,onNav,site,onLogoClick}){
 }
 
 // ═══════════════ HOME ═══════════════
+// 本文から文字数を実カウント（空白・改行除く）
+function countChars(novel) {
+  return (novel.chapters||[]).reduce((s,ch)=>s+(ch.content||"").replace(/\s/g,"").length, 0);
+}
+function fmtCount(n) {
+  if(n===0) return "0字";
+  if(n>=10000) return `${(n/10000).toFixed(1)}万字`;
+  return `${n.toLocaleString()}字`;
+}
+
 function HomePage({site,novels,onOpen}){
   const [activeTag,setActiveTag]=useState(null);
   const [byDate,setByDate]=useState(false);
   const allTags=useMemo(()=>[...new Set(novels.flatMap(n=>n.tags||[]))] ,[novels]);
 
+  // ピン固定を先頭に、残りは元の順序
+  const sorted=useMemo(()=>{
+    const pinned=novels.filter(n=>n.pinned);
+    const rest=novels.filter(n=>!n.pinned);
+    return [...pinned,...rest];
+  },[novels]);
+
   const filtered=useMemo(()=>{
-    let list=novels;
+    let list=sorted;
     if(activeTag) list=list.filter(n=>(n.tags||[]).includes(activeTag));
     return list;
-  },[novels,activeTag]);
+  },[sorted,activeTag]);
+
+  // 総文字数（全作品）
+  const totalChars=useMemo(()=>novels.reduce((s,n)=>s+countChars(n),0),[novels]);
 
   const grouped=useMemo(()=>groupByYM(filtered,n=>n.updated),[filtered]);
 
@@ -571,13 +606,14 @@ function HomePage({site,novels,onOpen}){
             <div className="nc-cover">
               <div className="nc-cover-bg" style={{background:`linear-gradient(160deg,${n.color1},${n.color2})`}}/>
               <div className="nc-cover-fade"/><div className="nc-dot" style={{background:n.accent,boxShadow:`0 0 12px ${n.accent}88`}}/>
+              {n.pinned&&<div style={{position:"absolute",top:12,left:12,fontSize:10,background:"var(--accent)",color:"var(--bg)",padding:"2px 7px",borderRadius:2,letterSpacing:".08em"}}>📌 固定</div>}
             </div>
             <div className="nc-body">
               <div className="nc-tags">{(n.tags||[]).slice(0,3).map(t=><span key={t} className="nc-tag">{t}</span>)}</div>
               <div className="nc-title">{n.title}</div>
               <div className="nc-subtitle">{n.subtitle}</div>
               <div className="nc-desc">{n.description}</div>
-              <div className="nc-footer"><span className="nc-author">{n.author}</span><span className="nc-words">{n.wordCount}</span></div>
+              <div className="nc-footer"><span className="nc-author">{n.author}</span><span className="nc-words">{fmtCount(countChars(n))}</span></div>
             </div>
           </div>
         ))
@@ -594,6 +630,7 @@ function HomePage({site,novels,onOpen}){
         <div className="hero-stats rise d4">
           <div><span className="hero-stat-num">{novels.length}</span><span className="hero-stat-lbl">作品</span></div>
           <div><span className="hero-stat-num">{novels.reduce((s,n)=>s+(n.chapters||[]).length,0)}</span><span className="hero-stat-lbl">章</span></div>
+          <div><span className="hero-stat-num">{fmtCount(totalChars)}</span><span className="hero-stat-lbl">総文字数</span></div>
         </div>
       </section>
       <section className="section">
@@ -1044,13 +1081,22 @@ function AdminPanel({store,onClose}){
             <div className="admin-title">作品管理</div>
             <div className="alist">
               {novels.length===0&&<div style={{padding:"24px",color:"var(--txt3)",fontSize:13}}>作品がありません</div>}
-              {novels.map(n=>(
+              {[...novels].sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)).map(n=>(
                 <div key={n.id} className="arow">
                   <div className="arow-dot" style={{background:n.accent,boxShadow:`0 0 8px ${n.accent}66`}}/>
-                  <div className="arow-info"><div className="arow-title">{n.title}</div><div className="arow-meta">{n.author} · {(n.chapters||[]).length}章 · {n.genre}</div></div>
+                  <div className="arow-info">
+                    <div className="arow-title">
+                      {n.pinned&&<span style={{marginRight:6,fontSize:11}}>📌</span>}
+                      {n.locked&&<span style={{marginRight:6,fontSize:11}}>🔒</span>}
+                      {n.title}
+                    </div>
+                    <div className="arow-meta">{n.author} · {(n.chapters||[]).length}章 · {fmtCount(countChars(n))}</div>
+                  </div>
                   <div className="arow-actions">
+                    <button className={`icon-btn ${n.pinned?"primary":""}`} title={n.pinned?"固定解除":"先頭に固定"} onClick={()=>updateNovel(n.id,{pinned:!n.pinned})}>{n.pinned?"📌":"📌"}</button>
+                    <button className={`icon-btn ${n.locked?"danger":""}`} title={n.locked?"ロック解除":"削除ロック"} onClick={()=>updateNovel(n.id,{locked:!n.locked})}>{n.locked?"🔒":"🔓"}</button>
                     <button className="icon-btn primary" onClick={()=>{ setEditNid(n.id); setSec("novel_edit"); }}>✏️ 編集</button>
-                    <button className="icon-btn danger" onClick={()=>setDelConfirm({type:"novel",id:n.id,label:n.title})}>🗑</button>
+                    <button className="icon-btn danger" disabled={!!n.locked} style={{opacity:n.locked?.3:1,cursor:n.locked?"not-allowed":"pointer"}} onClick={()=>!n.locked&&setDelConfirm({type:"novel",id:n.id,label:n.title})}>🗑</button>
                   </div>
                 </div>
               ))}
@@ -1065,7 +1111,21 @@ function AdminPanel({store,onClose}){
               <button className="back-link" onClick={()=>setSec("novels")}>← 作品一覧</button>
               <div className="admin-title" style={{margin:0}}>{eNov.title}</div>
             </div>
-            <div className="gradient-preview" style={{background:`linear-gradient(160deg,${eNov.color1},${eNov.color2})`}}/>
+            <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:3,padding:"4px 16px",marginBottom:24}}>
+              <div className="toggle-row">
+                <div><div className="toggle-label">📌 先頭に固定</div><div className="toggle-desc">作品一覧の最上部に表示されます</div></div>
+                <label className="toggle-switch"><input type="checkbox" checked={!!eNov.pinned} onChange={e=>updateNovel(eNov.id,{pinned:e.target.checked})}/><span className="toggle-slider"/></label>
+              </div>
+              <div className="toggle-row" style={{borderBottom:"none"}}>
+                <div><div className="toggle-label">🔒 削除ロック</div><div className="toggle-desc">ONにすると削除ボタンが無効になります</div></div>
+                <label className="toggle-switch"><input type="checkbox" checked={!!eNov.locked} onChange={e=>updateNovel(eNov.id,{locked:e.target.checked})}/><span className="toggle-slider"/></label>
+              </div>
+            </div>
+            <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:3,padding:"10px 16px",marginBottom:24,display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:11,color:"var(--txt3)",letterSpacing:".14em"}}>📝 実文字数（本文から自動計算）</span>
+              <span style={{fontFamily:"var(--serif)",fontSize:22,color:"var(--accent)",marginLeft:"auto"}}>{fmtCount(countChars(eNov))}</span>
+              <span style={{fontSize:11,color:"var(--txt3)"}}>/ {(eNov.chapters||[]).length}章</span>
+            </div>
             <div className="form-row">
               <ColorPicker label="カバー色①" value={eNov.color1} onChange={v=>updateNovel(eNov.id,{color1:v})}/>
               <ColorPicker label="カバー色②" value={eNov.color2} onChange={v=>updateNovel(eNov.id,{color2:v})}/>
@@ -1106,7 +1166,7 @@ function AdminPanel({store,onClose}){
             <div style={{display:"flex",gap:10,marginTop:24}}>
               <button className="btn btn-primary" onClick={()=>flash()}>保存する</button>
               {saved&&<span style={{lineHeight:"38px",fontSize:12,color:"var(--accent)"}}>✓ 保存しました</span>}
-              <button className="btn btn-danger" style={{marginLeft:"auto"}} onClick={()=>setDelConfirm({type:"novel",id:eNov.id,label:eNov.title})}>この作品を削除</button>
+              <button className="btn btn-danger" style={{marginLeft:"auto",opacity:eNov.locked?.3:1,cursor:eNov.locked?"not-allowed":"pointer"}} disabled={!!eNov.locked} onClick={()=>!eNov.locked&&setDelConfirm({type:"novel",id:eNov.id,label:eNov.title})}>{eNov.locked?"🔒 ロック中（削除不可）":"この作品を削除"}</button>
             </div>
           </div>
         )}
