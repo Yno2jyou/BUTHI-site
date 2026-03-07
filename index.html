@@ -254,11 +254,16 @@ function useStore() {
     setAuthorLocal(a => ({...a, murmurs: nextMurmurs}));
     try { await db.collection("settings").doc("author").update({ murmurs: nextMurmurs }); } catch(e) { console.error(e); }
   };
+  const updateMurmur = async (id, text) => {
+    const nextMurmurs = (author.murmurs||[]).map(m => m.id===id ? {...m, text} : m);
+    setAuthorLocal(a => ({...a, murmurs: nextMurmurs}));
+    try { await db.collection("settings").doc("author").update({ murmurs: nextMurmurs }); } catch(e) { console.error(e); }
+  };
 
   return { site, setSite, author, setAuthor, novels, messages, loading, dbError,
     addMessage, deleteMessage, markRead,
     addNovel, updateNovel, deleteNovel, addChapter, updateChapter, deleteChapter,
-    addMurmur, deleteMurmur };
+    addMurmur, deleteMurmur, updateMurmur };
 }
 
 // ═══════════════ HELPERS ═══════════════
@@ -785,7 +790,12 @@ function HitorigotoPage({author}){
   const [byDate,setByDate]=useState(false);
   const murmurs=useMemo(()=>author.murmurs||[],[author.murmurs]);
   const filtered=murmurs;
-  const grouped=useMemo(()=>groupByYM(filtered,m=>m.isoDate||m.date),[filtered]);
+  // 古い順に並べ直してからグループ化
+  const sortedAsc=useMemo(()=>[...filtered].sort((a,b)=>{
+    const da=new Date(a.isoDate||a.date), db2=new Date(b.isoDate||b.date);
+    return da-db2;
+  }),[filtered]);
+  const grouped=useMemo(()=>groupByYM(sortedAsc,m=>m.isoDate||m.date),[sortedAsc]);
 
   const renderList=list=>(
     list.length===0
@@ -882,10 +892,59 @@ function ProfilePage({author,novels,onToWorks,site,onSendMessage}){
   );
 }
 
+// ひとりごと編集リスト
+function MurmurEditList({murmurs, onUpdate, onDelete}){
+  const [editId, setEditId] = useState(null);
+  const [editText, setEditText] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = m => { setEditId(m.id); setEditText(m.text); };
+  const cancelEdit = () => { setEditId(null); setEditText(""); };
+  const saveEdit = async id => {
+    setSaving(true);
+    await onUpdate(id, editText);
+    setSaving(false);
+    setEditId(null);
+  };
+
+  if(murmurs.length===0) return <div style={{padding:"16px",color:"var(--txt3)",fontSize:13}}>まだ投稿がありません</div>;
+  return(
+    <div className="msg-list">
+      {murmurs.map(m=>(
+        <div key={m.id} className="msg-row" style={{cursor:"default"}}>
+          {editId===m.id ? (
+            <>
+              <textarea className="form-textarea" value={editText} onChange={e=>setEditText(e.target.value)} rows={4} style={{marginBottom:8}}/>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn btn-primary" disabled={saving} onClick={()=>saveEdit(m.id)} style={{fontSize:12,padding:"4px 14px"}}>{saving?"保存中…":"保存"}</button>
+                <button className="btn" onClick={cancelEdit} style={{fontSize:12,padding:"4px 14px"}}>キャンセル</button>
+              </div>
+            </>
+          ) : (
+            <div className="msg-body" style={{whiteSpace:"pre-wrap"}}>{m.text}</div>
+          )}
+          {(m.files||[]).length>0&&<div style={{display:"flex",gap:6,marginTop:8}}>
+            {(m.files||[]).map((f,i)=>f.type==="image"
+              ?<img key={i} src={f.data} alt="" style={{width:48,height:48,objectFit:"cover",border:"1px solid var(--border)",borderRadius:2}}/>
+              :<span key={i} style={{fontSize:11,color:"var(--txt3)"}}>📎{f.name}</span>)}
+          </div>}
+          <div className="msg-acts">
+            <span className="msg-date">{m.date}</span>
+            <div style={{marginLeft:"auto",display:"flex",gap:6}}>
+              {editId!==m.id&&<button className="icon-btn" style={{fontSize:11}} onClick={()=>startEdit(m)}>✏️ 編集</button>}
+              <button className="icon-btn danger" style={{fontSize:11}} onClick={()=>onDelete(m.id)}>🗑 削除</button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ═══════════════ ADMIN ═══════════════
 function AdminPanel({store,onClose}){
   const {site,setSite,author,setAuthor,novels,messages,deleteMessage,markRead,
-    addNovel,updateNovel,deleteNovel,addChapter,updateChapter,deleteChapter,addMurmur,deleteMurmur}=store;
+    addNovel,updateNovel,deleteNovel,addChapter,updateChapter,deleteChapter,addMurmur,deleteMurmur,updateMurmur}=store;
   const [sec,setSec]=useState("site");
   const [editNid,setEditNid]=useState(null);
   const [editCh,setEditCh]=useState(null);
@@ -1066,18 +1125,7 @@ function AdminPanel({store,onClose}){
               {murmurErr&&<div style={{marginTop:8,fontSize:12,color:"#ef4444"}}>⚠ {murmurErr}</div>}
               {!saving&&saved&&<span style={{marginLeft:12,fontSize:12,color:"var(--accent)"}}>✓ 投稿しました</span>}
             </div>
-            <div className="msg-list">
-              {(author.murmurs||[]).length===0&&<div style={{padding:"16px",color:"var(--txt3)",fontSize:13}}>まだ投稿がありません</div>}
-              {(author.murmurs||[]).map(m=>(
-                <div key={m.id} className="msg-row" style={{cursor:"default"}}>
-                  <div className="msg-body">{m.text}</div>
-                  {(m.files||[]).length>0&&<div style={{display:"flex",gap:6,marginTop:8}}>
-                    {(m.files||[]).map((f,i)=>f.type==="image"?<img key={i} src={f.data} alt="" style={{width:48,height:48,objectFit:"cover",border:"1px solid var(--border)",borderRadius:2}}/>:<span key={i} style={{fontSize:11,color:"var(--txt3)"}}>📎{f.name}</span>)}
-                  </div>}
-                  <div className="msg-acts"><span className="msg-date">{m.date}</span><button className="icon-btn danger" style={{marginLeft:"auto",fontSize:11}} onClick={()=>deleteMurmur(m.id)}>🗑 削除</button></div>
-                </div>
-              ))}
-            </div>
+            <MurmurEditList murmurs={author.murmurs||[]} onUpdate={updateMurmur} onDelete={deleteMurmur}/>
           </div>
         )}
 
