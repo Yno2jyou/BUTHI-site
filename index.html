@@ -1454,33 +1454,224 @@ function App(){
   const [transiting,setTransiting]=useState(false);
   const [visPage,setVisPage]=useState("home");
 
+  // ── 20パターンのトランジション定義 ──
+  const TRANSITIONS=[
+    // 0: 墨・中央から円形
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0;clip-path:circle(0% at 50% 50%)";
+      ov.style.transition="opacity 1s cubic-bezier(.4,0,.2,1),clip-path 1s cubic-bezier(.4,0,.2,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1";ov.style.clipPath="circle(120% at 50% 50%)"}));
+      setTimeout(done,1050);
+    },
+    // 1: 墨・左上から円形
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0;clip-path:circle(0% at 0% 0%)";
+      ov.style.transition="opacity 1s cubic-bezier(.4,0,.2,1),clip-path 1s cubic-bezier(.4,0,.2,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1";ov.style.clipPath="circle(150% at 0% 0%)"}));
+      setTimeout(done,1050);
+    },
+    // 2: 墨・右下から円形
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0;clip-path:circle(0% at 100% 100%)";
+      ov.style.transition="opacity 1s cubic-bezier(.4,0,.2,1),clip-path 1s cubic-bezier(.4,0,.2,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1";ov.style.clipPath="circle(150% at 100% 100%)"}));
+      setTimeout(done,1050);
+    },
+    // 3: 横スライド・左から
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);transform:translateX(-100%)";
+      ov.style.transition="transform .9s cubic-bezier(.77,0,.18,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.transform="translateX(0)"}));
+      setTimeout(done,950);
+    },
+    // 4: 横スライド・右から
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);transform:translateX(100%)";
+      ov.style.transition="transform .9s cubic-bezier(.77,0,.18,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.transform="translateX(0)"}));
+      setTimeout(done,950);
+    },
+    // 5: 縦スライド・上から
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);transform:translateY(-100%)";
+      ov.style.transition="transform .9s cubic-bezier(.77,0,.18,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.transform="translateY(0)"}));
+      setTimeout(done,950);
+    },
+    // 6: 縦スライド・下から
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);transform:translateY(100%)";
+      ov.style.transition="transform .9s cubic-bezier(.77,0,.18,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.transform="translateY(0)"}));
+      setTimeout(done,950);
+    },
+    // 7: フェードのみ
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0";
+      ov.style.transition="opacity 1s ease";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1"}));
+      setTimeout(done,1050);
+    },
+    // 8: ダイヤモンド（菱形）
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:polygon(50% 50%,50% 50%,50% 50%,50% 50%)";
+      ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="polygon(50% -50%,150% 50%,50% 150%,-50% 50%)"}));
+      setTimeout(done,1050);
+    },
+    // 9: 縦帯・中央から左右
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:inset(0 50% 0 50%)";
+      ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="inset(0 0% 0 0%)"}));
+      setTimeout(done,1050);
+    },
+    // 10: 横帯・中央から上下
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:inset(50% 0 50% 0)";
+      ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="inset(0% 0 0% 0)"}));
+      setTimeout(done,1050);
+    },
+    // 11: ズームイン（拡大しながら暗転）
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0;transform:scale(.88)";
+      ov.style.transition="opacity .85s ease,transform .85s cubic-bezier(.4,0,.2,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1";ov.style.transform="scale(1)"}));
+      setTimeout(done,900);
+    },
+    // 12: ズームアウト（縮小しながら暗転）
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0;transform:scale(1.12)";
+      ov.style.transition="opacity .85s ease,transform .85s cubic-bezier(.4,0,.2,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1";ov.style.transform="scale(1)"}));
+      setTimeout(done,900);
+    },
+    // 13: 斜め切り・左上→右下
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:polygon(-10% -10%,-10% -10%,0% 0%,0% 0%)";
+      ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="polygon(-10% -10%,110% -10%,110% 110%,-10% 110%)"}));
+      setTimeout(done,1050);
+    },
+    // 14: 斜め切り・右上→左下
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:polygon(110% -10%,110% -10%,100% 0%,100% 0%)";
+      ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="polygon(110% -10%,110% 110%,-10% 110%,-10% -10%)"}));
+      setTimeout(done,1050);
+    },
+    // 15: 墨・下から縦帯
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:inset(100% 0 0 0)";
+      ov.style.transition="clip-path 1s cubic-bezier(.77,0,.18,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="inset(0% 0 0 0)"}));
+      setTimeout(done,1050);
+    },
+    // 16: 墨・上から縦帯
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:inset(0 0 100% 0)";
+      ov.style.transition="clip-path 1s cubic-bezier(.77,0,.18,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="inset(0 0 0% 0)"}));
+      setTimeout(done,1050);
+    },
+    // 17: アクセントカラーの閃光→墨
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--accent);opacity:0";
+      ov.style.transition="opacity .18s ease";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1"}));
+      setTimeout(()=>{
+        ov.style.background="var(--bg)";
+        ov.style.transition="background .6s ease,opacity .6s ease";
+      },200);
+      setTimeout(done,900);
+    },
+    // 18: 十字・中央から四方
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:polygon(49% 49%,51% 49%,51% 51%,49% 51%)";
+      ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="polygon(0% 0%,100% 0%,100% 100%,0% 100%)"}));
+      setTimeout(done,1050);
+    },
+    // 19: 墨・右端から横帯
+    (ov,done)=>{
+      ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:inset(0 0 0 100%)";
+      ov.style.transition="clip-path 1s cubic-bezier(.77,0,.18,1)";
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="inset(0 0 0 0%)"}));
+      setTimeout(done,1050);
+    },
+  ];
+
+  // 退場アニメ（逆方向）
+  const OUTRO=[
+    // 0
+    ov=>{ov.style.transition="opacity .7s cubic-bezier(.4,0,.6,1),clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.opacity="0";ov.style.clipPath="circle(0% at 50% 50%)"},
+    // 1
+    ov=>{ov.style.transition="opacity .7s ease,clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.opacity="0";ov.style.clipPath="circle(0% at 0% 0%)"},
+    // 2
+    ov=>{ov.style.transition="opacity .7s ease,clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.opacity="0";ov.style.clipPath="circle(0% at 100% 100%)"},
+    // 3
+    ov=>{ov.style.transition="transform .8s cubic-bezier(.77,0,.18,1)";ov.style.transform="translateX(100%)"},
+    // 4
+    ov=>{ov.style.transition="transform .8s cubic-bezier(.77,0,.18,1)";ov.style.transform="translateX(-100%)"},
+    // 5
+    ov=>{ov.style.transition="transform .8s cubic-bezier(.77,0,.18,1)";ov.style.transform="translateY(100%)"},
+    // 6
+    ov=>{ov.style.transition="transform .8s cubic-bezier(.77,0,.18,1)";ov.style.transform="translateY(-100%)"},
+    // 7
+    ov=>{ov.style.transition="opacity .7s ease";ov.style.opacity="0"},
+    // 8
+    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="polygon(50% 50%,50% 50%,50% 50%,50% 50%)"},
+    // 9
+    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="inset(0 50% 0 50%)"},
+    // 10
+    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="inset(50% 0 50% 0)"},
+    // 11
+    ov=>{ov.style.transition="opacity .7s ease,transform .7s ease";ov.style.opacity="0";ov.style.transform="scale(1.08)"},
+    // 12
+    ov=>{ov.style.transition="opacity .7s ease,transform .7s ease";ov.style.opacity="0";ov.style.transform="scale(.94)"},
+    // 13
+    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="polygon(110% 110%,110% 110%,100% 100%,100% 100%)"},
+    // 14
+    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="polygon(-10% 110%,-10% 110%,0% 100%,0% 100%)"},
+    // 15
+    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="inset(100% 0 0 0)"},
+    // 16
+    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="inset(0 0 100% 0)"},
+    // 17
+    ov=>{ov.style.transition="opacity .6s ease";ov.style.opacity="0"},
+    // 18
+    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="polygon(49% 49%,51% 49%,51% 51%,49% 51%)"},
+    // 19
+    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="inset(0 100% 0 0)"},
+  ];
+
   const nav=dest=>{
     if(transiting||dest===visPage) return;
     setTransiting(true);
 
-    const overlay=document.createElement("div");
-    overlay.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0;clip-path:circle(0% at 50% 50%)";
-    document.body.appendChild(overlay);
+    // 作品ページへの遷移はnovelのindexでパターン固定、それ以外はランダム
+    let idx;
+    if(dest==="detail"&&novel){
+      const novels2=novels||[];
+      const ni=novels2.findIndex(n=>n.id===novel.id);
+      idx=ni>=0 ? ni%TRANSITIONS.length : 0;
+    } else {
+      idx=Math.floor(Math.random()*TRANSITIONS.length);
+    }
 
-    // 広がる
-    overlay.style.transition="opacity .7s cubic-bezier(.4,0,.2,1), clip-path .85s cubic-bezier(.4,0,.2,1)";
-    requestAnimationFrame(()=>{
-      requestAnimationFrame(()=>{
-        overlay.style.opacity="1";
-        overlay.style.clipPath="circle(120% at 50% 50%)";
-      });
-    });
+    const ov=document.createElement("div");
+    document.body.appendChild(ov);
 
-    // 覆いきったらページ切り替え→引く
-    setTimeout(()=>{
+    TRANSITIONS[idx](ov,()=>{
       window.scrollTo({top:0});
       setPage(dest);
       setVisPage(dest);
-      overlay.style.transition="opacity .55s cubic-bezier(.4,0,.6,1), clip-path .55s cubic-bezier(.4,0,.6,1)";
-      overlay.style.opacity="0";
-      overlay.style.clipPath="circle(0% at 50% 50%)";
-      setTimeout(()=>{ overlay.remove(); setTransiting(false); },580);
-    },680);
+      setTimeout(()=>{
+        OUTRO[idx](ov);
+        setTimeout(()=>{ ov.remove(); setTransiting(false); },850);
+      },40);
+    });
   };
   const openNovel=n=>{ setNovel(n); nav("detail"); };
   const openChapter=id=>{ setChapterId(id); nav("reading"); };
