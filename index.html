@@ -1336,31 +1336,50 @@ function BgTextLayer({novels}){
   React.useEffect(()=>{
     if(!novels||novels.length===0) return;
     const sentences = [];
+
     novels.forEach(n=>{
       (n.chapters||[]).forEach(ch=>{
-        const txt = (ch.content||"");
-        const parts = txt.split(/(?<=。)/).map(s=>s.trim()).filter(s=>s.length>=8&&s.length<=32);
-        parts.forEach(p=>{ sentences.push(p); });
+        const txt = (ch.content||"").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
+
+        // ── セリフ抽出：「…」「…」『…』で囲まれた全文（句点含む） ──
+        const dialogRe = /[「『]((?:[^「『」』]|(?:[「『][^「『」』]*[」』]))*)[」』]/g;
+        let m;
+        while((m=dialogRe.exec(txt))!==null){
+          const s = m[0].trim();
+          if(s.length>=6) sentences.push(s);
+        }
+
+        // ── 地の文：句点で区切った一文（セリフ部分を除外） ──
+        // セリフ記号をマスクしてから分割
+        const masked = txt.replace(dialogRe, s=>"　".repeat(s.length));
+        const jiParts = masked.split(/(?<=。)/).map((_,i,arr)=>{
+          // maskedではなく元txtの対応位置から取得
+          let pos=0; for(let j=0;j<i;j++) pos+=arr[j].length;
+          return txt.slice(pos, pos+arr[i].length).trim();
+        }).filter(s=>{
+          const clean=s.replace(/[「『][^」』]*[」』]/g,"").trim();
+          return clean.length>=10 && !/^[「『]/.test(s.trim());
+        });
+        jiParts.forEach(p=>sentences.push(p));
       });
     });
+
     if(sentences.length===0) return;
     const shuffled=[...sentences].sort(()=>Math.random()-.5);
 
-    // 文字サイズ12px、縦書き1文字幅≒14px
-    // 各スロットに1文だけ配置してX方向の重なりを完全排除
-    const CHAR_W = 16;        // 1列分の幅(px)：文字+余白
-    const GAP    = 28;        // 列間の最低余白(px)
-    const SLOT_W = CHAR_W + GAP; // 1スロット = 44px
+    // スロット配置（重なり防止）
+    const CHAR_W = 16;
+    const GAP    = 30;
+    const SLOT_W = CHAR_W + GAP;
     const W = window.innerWidth;
     const maxSlots = Math.floor(W / SLOT_W);
-    const count = Math.min(maxSlots, 22, shuffled.length);
-
-    // スロットをシャッフルして均等散在
+    // フレーズ数の上限を撤廃（全文使用、スロット数が上限）
+    const count = Math.min(maxSlots, shuffled.length);
     const slots = Array.from({length:maxSlots},(_,i)=>i).sort(()=>Math.random()-.5).slice(0,count);
 
-    const result = slots.map((slot, i)=>({
+    const result = slots.map((slot,i)=>({
       text: shuffled[i],
-      left: slot * SLOT_W + 8,   // px
+      left: slot * SLOT_W + 8,
       goUp: Math.random()>.5,
       dur:  44 + Math.random()*26,
       delay: -(Math.random()*70),
