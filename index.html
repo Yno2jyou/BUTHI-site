@@ -72,9 +72,13 @@ const ADMIN_PASSWORD = "abbcccddddeeeee";
 // ═══════════════ FIREBASE HELPERS ═══════════════
 // ファイル（画像など）をFirebase Storageにアップロードし、URLを返す
 async function uploadFile(file, path) {
-  const ref = storage.ref(path);
-  await ref.putString(file.data, "data_url");
-  return await ref.getDownloadURL();
+  const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error("upload timeout")),30000));
+  const upload = async ()=>{
+    const ref = storage.ref(path);
+    await ref.putString(file.data, "data_url");
+    return await ref.getDownloadURL();
+  };
+  return await Promise.race([upload(), timeout]);
 }
 
 // base64データURIかどうかを判定
@@ -232,7 +236,13 @@ function useStore() {
     const now = new Date();
     // ファイルをStorageへアップロード
     let uploadedFiles = [];
-    try { uploadedFiles = await uploadMurmurFiles(mid, files||[]); } catch(e) { console.error(e); }
+    try {
+      uploadedFiles = await uploadMurmurFiles(mid, files||[]);
+    } catch(e) {
+      console.error("Storage upload failed, storing as base64:", e);
+      // Storageが使えない場合はbase64のまま保存（フォールバック）
+      uploadedFiles = files||[];
+    }
     const m = { id: mid, text, files: uploadedFiles, date: now.toLocaleString("ja-JP"), isoDate: now.toISOString() };
     const nextMurmurs = [m, ...(author.murmurs||[])];
     setAuthorLocal(a => ({...a, murmurs: nextMurmurs}));
@@ -880,6 +890,7 @@ function AdminPanel({store,onClose}){
   const [editCh,setEditCh]=useState(null);
   const [delConfirm,setDelConfirm]=useState(null);
   const [saved,setSaved]=useState(false);
+  const [murmurErr,setMurmurErr]=useState("");
   const [newMurmur,setNewMurmur]=useState("");
   const [newFiles,setNewFiles]=useState([]);
   const [newLL,setNewLL]=useState(""); const [newLU,setNewLU]=useState("");
@@ -1043,8 +1054,15 @@ function AdminPanel({store,onClose}){
                   ))}
                 </div>
               )}
-              <button className="btn btn-primary" disabled={saving||(!newMurmur.trim()&&newFiles.length===0)} onClick={async()=>{ await flash(()=>addMurmur(newMurmur.trim(),newFiles)); setNewMurmur(""); setNewFiles([]); }}>投稿する</button>
+              <button className="btn btn-primary" disabled={saving||(!newMurmur.trim()&&newFiles.length===0)} onClick={async()=>{
+                setMurmurErr("");
+                await flash(async ()=>{
+                  try{ await addMurmur(newMurmur.trim(),newFiles); setNewMurmur(""); setNewFiles([]); }
+                  catch(e){ setMurmurErr(e.message||"エラーが発生しました"); }
+                });
+              }}>投稿する</button>
               {saving&&<span style={{marginLeft:12,fontSize:12,color:"var(--txt3)"}}>⌛ アップロード中…</span>}
+              {murmurErr&&<div style={{marginTop:8,fontSize:12,color:"#ef4444"}}>⚠ {murmurErr}</div>}
               {!saving&&saved&&<span style={{marginLeft:12,fontSize:12,color:"var(--accent)"}}>✓ 投稿しました</span>}
             </div>
             <div className="msg-list">
