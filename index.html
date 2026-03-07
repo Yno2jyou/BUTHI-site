@@ -71,36 +71,42 @@ const ADMIN_PASSWORD = "abbcccddddeeeee";
 
 // ═══════════════ FIREBASE HELPERS ═══════════════
 // ファイル（画像など）をFirebase Storageにアップロードし、URLを返す
-async function uploadFile(file, path) {
-  const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error("upload timeout")),30000));
-  const upload = async ()=>{
-    const ref = storage.ref(path);
-    await ref.putString(file.data, "data_url");
-    return await ref.getDownloadURL();
-  };
-  return await Promise.race([upload(), timeout]);
-}
-
 // base64データURIかどうかを判定
 const isDataUri = s => typeof s === "string" && s.startsWith("data:");
 
-// ひとりごとのファイル添付をStorageへアップロードし、URLに変換する
+// 画像をCanvas経由でリサイズ・圧縮してbase64を返す（Firestore直接保存用）
+async function compressImage(dataUri, maxPx=800, quality=0.72) {
+  return new Promise((resolve)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const scale = Math.min(1, maxPx/Math.max(img.width,img.height));
+      const w = Math.round(img.width*scale);
+      const h = Math.round(img.height*scale);
+      const canvas = document.createElement("canvas");
+      canvas.width=w; canvas.height=h;
+      canvas.getContext("2d").drawImage(img,0,0,w,h);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = ()=>resolve(dataUri);
+    img.src = dataUri;
+  });
+}
+
+// ひとりごとのファイルを圧縮してbase64のまま返す（Storage不使用）
 async function uploadMurmurFiles(murmurId, files) {
-  return await Promise.all((files||[]).map(async (f, i) => {
-    if (!isDataUri(f.data)) return f; // すでにURL済みはスキップ
-    const ext = f.name.split(".").pop();
-    const path = `murmurs/${murmurId}/file_${i}.${ext}`;
-    const url = await uploadFile(f, path);
-    return { ...f, data: url };
+  return await Promise.all((files||[]).map(async (f) => {
+    if (f.type==="image" && isDataUri(f.data)) {
+      const compressed = await compressImage(f.data);
+      return { ...f, data: compressed };
+    }
+    return f;
   }));
 }
 
-// 著者アイコンをStorageへアップロード
+// 著者アイコンを圧縮してbase64のまま返す（Storage不使用）
 async function uploadAuthorIcon(dataUri) {
   if (!isDataUri(dataUri)) return dataUri;
-  const ref = storage.ref("author/icon.jpg");
-  await ref.putString(dataUri, "data_url");
-  return await ref.getDownloadURL();
+  return await compressImage(dataUri, 400, 0.80);
 }
 
 // ═══════════════ FIRESTORE STORE ═══════════════
@@ -236,13 +242,8 @@ function useStore() {
     const now = new Date();
     // ファイルをStorageへアップロード
     let uploadedFiles = [];
-    try {
-      uploadedFiles = await uploadMurmurFiles(mid, files||[]);
-    } catch(e) {
-      console.error("Storage upload failed, storing as base64:", e);
-      // Storageが使えない場合はbase64のまま保存（フォールバック）
-      uploadedFiles = files||[];
-    }
+    try { uploadedFiles = await uploadMurmurFiles(mid, files||[]); }
+    catch(e) { console.error(e); uploadedFiles = files||[]; }
     const m = { id: mid, text, files: uploadedFiles, date: now.toLocaleString("ja-JP"), isoDate: now.toISOString() };
     const nextMurmurs = [m, ...(author.murmurs||[])];
     setAuthorLocal(a => ({...a, murmurs: nextMurmurs}));
