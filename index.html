@@ -494,6 +494,15 @@ function Styles({site}){
     .mobile-back-btn{display:none}
     @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
     @keyframes driftDown{0%{transform:translateY(-120px)}100%{transform:translateY(100vh)}}
+    /* ページ遷移オーバーレイ */
+    .pt-overlay{position:fixed;inset:0;z-index:8000;pointer-events:none;overflow:hidden}
+    .pt-ink{position:absolute;inset:0;background:var(--bg);transform-origin:center;opacity:0}
+    .pt-slide{position:absolute;inset:0;background:var(--bg);transform:translateX(-100%)}
+    .pt-char{position:fixed;font-family:var(--serif);color:var(--txt2);pointer-events:none;z-index:8001;opacity:0;font-size:18px;transition:none}
+    @keyframes ptCharScatter{0%{opacity:.7;transform:translate(0,0) rotate(0deg) scale(1)}100%{opacity:0;transform:var(--tx) rotate(var(--rot)) scale(.4)}}
+    @keyframes ptInkIn{0%{opacity:0;transform:scale(.85)}40%{opacity:1;transform:scale(1.04)}100%{opacity:1;transform:scale(1)}}
+    @keyframes ptInkOut{0%{opacity:1}100%{opacity:0}}
+    @keyframes ptSlideIn{0%{transform:translateX(-6%)}100%{transform:translateX(0)}}
     @keyframes driftUp{0%{transform:translateY(110vh)}100%{transform:translateY(-120px)}}
     .bg-text-layer{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
     .bg-text-col{position:absolute;top:0;display:flex;flex-direction:column;gap:2.2em;writing-mode:vertical-rl;text-orientation:mixed;font-family:var(--serif);white-space:nowrap;will-change:transform}
@@ -1430,7 +1439,61 @@ function App(){
   const [showLogin,setShowLogin]=useState(false);
   const [authed,setAuthed]=useState(false);
 
-  const nav=p=>{ setPage(p); window.scrollTo({top:0,behavior:"smooth"}); };
+  const [transiting,setTransiting]=useState(false);
+  const [visPage,setVisPage]=useState("home"); // 実際に表示中のページ
+
+  const nav=p=>{
+    if(transiting||p===visPage) return;
+    setTransiting(true);
+
+    // フェーズ1: 文字を散らす(0〜400ms) + 墨が染まる(200〜900ms)
+    const chars="生死愛憎光闇夢幻刹那永遠想記忘哀歌詩";
+    const floats=[];
+    for(let i=0;i<14;i++){
+      const el=document.createElement("span");
+      el.className="pt-char";
+      el.textContent=chars[Math.floor(Math.random()*chars.length)];
+      const sx=10+Math.random()*80, sy=10+Math.random()*80;
+      const dx=(Math.random()-0.5)*320, dy=(Math.random()-0.5)*320;
+      const rot=(Math.random()-0.5)*180;
+      el.style.cssText=`left:${sx}vw;top:${sy}vh;--tx:translate(${dx}px,${dy}px);--rot:${rot}deg;animation:ptCharScatter .7s ${i*30}ms cubic-bezier(.4,0,.6,1) forwards`;
+      document.body.appendChild(el);
+      floats.push(el);
+    }
+
+    // 墨オーバーレイ
+    const overlay=document.createElement("div");
+    overlay.className="pt-overlay";
+    const ink=document.createElement("div");
+    ink.className="pt-ink";
+    ink.style.cssText="animation:ptInkIn .85s 180ms cubic-bezier(.4,0,.2,1) forwards";
+    overlay.appendChild(ink);
+    document.body.appendChild(overlay);
+
+    setTimeout(()=>{
+      // フェーズ2: ページ切り替え
+      floats.forEach(el=>el.remove());
+      window.scrollTo({top:0});
+      setPage(p);
+      setVisPage(p);
+
+      // フェーズ3: 墨が引く + 横スライドで登場
+      ink.style.cssText="animation:ptInkOut .55s .1s ease-in forwards";
+
+      // スライドは主コンテンツ側でCSSクラスで対応
+      const main=document.getElementById("pt-main");
+      if(main){
+        main.style.animation="none";
+        main.offsetHeight; // reflow
+        main.style.animation="ptSlideIn .9s cubic-bezier(.16,1,.3,1) forwards";
+      }
+
+      setTimeout(()=>{
+        overlay.remove();
+        setTransiting(false);
+      }, 900);
+    }, 920);
+  };
   const openNovel=n=>{ setNovel(n); nav("detail"); };
   const openChapter=id=>{ setChapterId(id); nav("reading"); };
   const liveNovel=novel?novels.find(n=>n.id===novel.id)||novel:null;
@@ -1503,11 +1566,13 @@ function App(){
         {!loading&&!dbError&&!adminOpen&&page!=="reading"&&(
           <Nav page={page} onNav={nav} site={site} onLogoClick={handleLogoClick}/>
         )}
+        <div id="pt-main" style={{willChange:"transform"}}>
         {!loading&&!dbError&&!adminOpen&&page==="home"&&<HomePage site={site} novels={novels} onOpen={openNovel}/>}
         {!loading&&!dbError&&!adminOpen&&page==="hitorigoto"&&<HitorigotoPage author={author}/>}
         {!loading&&!dbError&&!adminOpen&&page==="detail"&&liveNovel&&<DetailPage novel={liveNovel} onBack={()=>nav("home")} onRead={openChapter} onSendMessage={addMessage}/>}
         {!loading&&!dbError&&!adminOpen&&page==="reading"&&liveNovel&&chapterId&&<ReadingPage novel={liveNovel} chapterId={chapterId} onBack={()=>nav("detail")} onChapter={setChapterId}/>}
         {!loading&&!dbError&&!adminOpen&&page==="profile"&&<ProfilePage author={author} novels={novels} onToWorks={()=>nav("home")} site={site} onSendMessage={addMessage}/>}
+        </div>
         {!loading&&!dbError&&adminOpen&&<AdminPanel store={store} onClose={()=>setAdminOpen(false)}/>}
         {showLogin&&<LoginModal onSuccess={()=>{ setAuthed(true); setShowLogin(false); setAdminOpen(true); }} onCancel={()=>setShowLogin(false)}/>}
       </div>
