@@ -636,10 +636,11 @@ function HomePage({site,novels,onOpen}){
   const [byDate,setByDate]=useState(false);
   const allTags=useMemo(()=>[...new Set(novels.flatMap(n=>n.tags||[]))] ,[novels]);
 
-  // ピン固定を先頭に、残りは元の順序
+  // order順 → ピン固定を先頭に
   const sorted=useMemo(()=>{
-    const pinned=novels.filter(n=>n.pinned);
-    const rest=novels.filter(n=>!n.pinned);
+    const ordered=[...novels].sort((a,b)=>(a.order??9999)-(b.order??9999));
+    const pinned=ordered.filter(n=>n.pinned);
+    const rest=ordered.filter(n=>!n.pinned);
     return [...pinned,...rest];
   },[novels]);
 
@@ -762,15 +763,14 @@ function DetailPage({novel,onBack,onRead,onSendMessage}){
 
 // ═══════════════ READING ═══════════════
 // 改行ルール：1改行→段落、空行（連続改行）→そのまま空白として表示
-function renderBody(content) {
+function renderBody(content, indent=true) {
   const lines = content.split("\n");
   const result = [];
   lines.forEach((line, i) => {
     if (line.trim() === "") {
-      // 空行 → 視覚的な空白行
       result.push(<div key={`blank-${i}`} style={{height:"1.4em"}}/>);
     } else {
-      result.push(<p key={`p-${i}`}>{line}</p>);
+      result.push(<p key={`p-${i}`} style={{textIndent: indent ? "1em" : "0"}}>{line}</p>);
     }
   });
   return result;
@@ -794,7 +794,7 @@ function ReadingPage({novel,chapterId,onBack,onChapter}){
       <div className="reading-content">
         <div className="reading-eyebrow rise d1">{String(idx+1).padStart(2,"0")} / {(novel.chapters||[]).length}</div>
         <h2 className="reading-ch-title rise d2">{ch.title}</h2>
-        <div className="reading-body rise d3">{renderBody(ch.content)}</div>
+        <div className="reading-body rise d3">{renderBody(ch.content, novel.indent!==false)}</div>
       </div>
       <div className="reading-foot">
         <button className="reading-foot-btn" disabled={!prev} onClick={()=>prev&&onChapter(prev.id)}>← 前の章</button>
@@ -1200,27 +1200,48 @@ function AdminPanel({store,onClose}){
         {sec==="novels"&&(
           <div className="fadein">
             <div className="admin-title">作品管理</div>
+            <div style={{marginBottom:12,fontSize:12,color:"var(--txt3)"}}>↕ ボタンで表示順を変更できます（ピン固定は常に先頭）</div>
             <div className="alist">
               {novels.length===0&&<div style={{padding:"24px",color:"var(--txt3)",fontSize:13}}>作品がありません</div>}
-              {[...novels].sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)).map(n=>(
-                <div key={n.id} className="arow">
-                  <div className="arow-dot" style={{background:n.accent,boxShadow:`0 0 8px ${n.accent}66`}}/>
-                  <div className="arow-info">
-                    <div className="arow-title">
-                      {n.pinned&&<span style={{marginRight:6,fontSize:11}}>📌</span>}
-                      {n.locked&&<span style={{marginRight:6,fontSize:11}}>🔒</span>}
-                      {n.title}
+              {(()=>{
+                // order付きで並べる（orderがなければFirestore取得順）
+                const ordered=[...novels].sort((a,b)=>{
+                  const ao=a.order??9999, bo=b.order??9999;
+                  return ao-bo;
+                });
+                const moveNovel=(id,dir)=>{
+                  const idx=ordered.findIndex(n=>n.id===id);
+                  const target=idx+dir;
+                  if(target<0||target>=ordered.length) return;
+                  // swap order values
+                  const newOrdered=[...ordered];
+                  [newOrdered[idx],newOrdered[target]]=[newOrdered[target],newOrdered[idx]];
+                  newOrdered.forEach((n,i)=>updateNovel(n.id,{order:i}));
+                };
+                return ordered.map((n,idx)=>(
+                  <div key={n.id} className="arow">
+                    <div style={{display:"flex",flexDirection:"column",gap:2,marginRight:6}}>
+                      <button className="icon-btn" style={{fontSize:10,padding:"1px 5px",lineHeight:1.4}} disabled={idx===0} onClick={()=>moveNovel(n.id,-1)}>▲</button>
+                      <button className="icon-btn" style={{fontSize:10,padding:"1px 5px",lineHeight:1.4}} disabled={idx===ordered.length-1} onClick={()=>moveNovel(n.id,1)}>▼</button>
                     </div>
-                    <div className="arow-meta">{n.author} · {(n.chapters||[]).length}章 · {fmtCount(countChars(n))}</div>
+                    <div className="arow-dot" style={{background:n.accent,boxShadow:`0 0 8px ${n.accent}66`}}/>
+                    <div className="arow-info">
+                      <div className="arow-title">
+                        {n.pinned&&<span style={{marginRight:6,fontSize:11}}>📌</span>}
+                        {n.locked&&<span style={{marginRight:6,fontSize:11}}>🔒</span>}
+                        {n.title}
+                      </div>
+                      <div className="arow-meta">{n.author} · {(n.chapters||[]).length}章 · {fmtCount(countChars(n))}</div>
+                    </div>
+                    <div className="arow-actions">
+                      <button className={`icon-btn ${n.pinned?"primary":""}`} title={n.pinned?"固定解除":"先頭に固定"} onClick={()=>updateNovel(n.id,{pinned:!n.pinned})}>{n.pinned?"📌":"📌"}</button>
+                      <button className={`icon-btn ${n.locked?"danger":""}`} title={n.locked?"ロック解除":"削除ロック"} onClick={()=>updateNovel(n.id,{locked:!n.locked})}>{n.locked?"🔒":"🔓"}</button>
+                      <button className="icon-btn primary" onClick={()=>{ setEditNid(n.id); setSec("novel_edit"); setMenuSelected(true); }}>✏️ 編集</button>
+                      <button className="icon-btn danger" disabled={!!n.locked} style={{opacity:n.locked?.3:1,cursor:n.locked?"not-allowed":"pointer"}} onClick={()=>!n.locked&&setDelConfirm({type:"novel",id:n.id,label:n.title})}>🗑</button>
+                    </div>
                   </div>
-                  <div className="arow-actions">
-                    <button className={`icon-btn ${n.pinned?"primary":""}`} title={n.pinned?"固定解除":"先頭に固定"} onClick={()=>updateNovel(n.id,{pinned:!n.pinned})}>{n.pinned?"📌":"📌"}</button>
-                    <button className={`icon-btn ${n.locked?"danger":""}`} title={n.locked?"ロック解除":"削除ロック"} onClick={()=>updateNovel(n.id,{locked:!n.locked})}>{n.locked?"🔒":"🔓"}</button>
-                    <button className="icon-btn primary" onClick={()=>{ setEditNid(n.id); setSec("novel_edit"); setMenuSelected(true); }}>✏️ 編集</button>
-                    <button className="icon-btn danger" disabled={!!n.locked} style={{opacity:n.locked?.3:1,cursor:n.locked?"not-allowed":"pointer"}} onClick={()=>!n.locked&&setDelConfirm({type:"novel",id:n.id,label:n.title})}>🗑</button>
-                  </div>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
             <button className="btn btn-primary" onClick={async()=>{ const id=await addNovel(); setEditNid(id); setSec("novel_edit"); setMenuSelected(true); }}>＋ 新しい作品を追加</button>
           </div>
@@ -1237,9 +1258,13 @@ function AdminPanel({store,onClose}){
                 <div><div className="toggle-label">📌 先頭に固定</div><div className="toggle-desc">作品一覧の最上部に表示されます</div></div>
                 <label className="toggle-switch"><input type="checkbox" checked={!!eNov.pinned} onChange={e=>updateNovel(eNov.id,{pinned:e.target.checked})}/><span className="toggle-slider"/></label>
               </div>
-              <div className="toggle-row" style={{borderBottom:"none"}}>
+              <div className="toggle-row">
                 <div><div className="toggle-label">🔒 削除ロック</div><div className="toggle-desc">ONにすると削除ボタンが無効になります</div></div>
                 <label className="toggle-switch"><input type="checkbox" checked={!!eNov.locked} onChange={e=>updateNovel(eNov.id,{locked:e.target.checked})}/><span className="toggle-slider"/></label>
+              </div>
+              <div className="toggle-row" style={{borderBottom:"none"}}>
+                <div><div className="toggle-label">↵ 文頭一字空け</div><div className="toggle-desc">段落の先頭に全角スペースを自動挿入</div></div>
+                <label className="toggle-switch"><input type="checkbox" checked={eNov.indent!==false} onChange={e=>updateNovel(eNov.id,{indent:e.target.checked})}/><span className="toggle-slider"/></label>
               </div>
             </div>
             <div style={{background:"color-mix(in srgb,var(--bg) 92%,#888 8%)",border:"1px solid rgba(255,255,255,.1)",borderRadius:3,padding:"10px 16px",marginBottom:24,display:"flex",alignItems:"center",gap:10}}>
