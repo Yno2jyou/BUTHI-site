@@ -1454,47 +1454,33 @@ function App(){
   const [transiting,setTransiting]=useState(false);
   const [visPage,setVisPage]=useState("home");
 
-  const nav=p=>{
-    if(transiting||p===visPage) return;
+  const nav=dest=>{
+    if(transiting||dest===visPage) return;
     setTransiting(true);
 
-    // 墨オーバーレイ：radial-gradientで中央から広がる
     const overlay=document.createElement("div");
-    overlay.style.cssText=`
-      position:fixed;inset:0;z-index:8000;pointer-events:none;
-      background:radial-gradient(circle at 50% 50%, var(--bg) 0%, var(--bg) 100%);
-      opacity:0;
-    `;
+    overlay.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0;clip-path:circle(0% at 50% 50%)";
     document.body.appendChild(overlay);
 
-    // フェーズ1: 中央から滲み出す（clip-pathで広がる）
-    let start=null;
-    const expandDur=600;
-    const expandAnim=ts=>{
-      if(!start) start=ts;
-      const p=Math.min((ts-start)/expandDur,1);
-      // ease-in-out
-      const e=p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
-      overlay.style.opacity=String(e);
-      // clip-pathで円形に広げる
-      const pct=Math.round(e*120);
-      overlay.style.clipPath=`circle(${pct}% at 50% 50%)`;
-      if(p<1) requestAnimationFrame(expandAnim);
-      else {
-        // フェーズ2: ページ切り替え
-        window.scrollTo({top:0});
-        setPage(()=>p);
-        setVisPage(p);
-        // すっと引く
-        overlay.style.transition="opacity .55s cubic-bezier(.4,0,.6,1), clip-path .55s cubic-bezier(.4,0,.6,1)";
-        setTimeout(()=>{
-          overlay.style.opacity="0";
-          overlay.style.clipPath="circle(0% at 50% 50%)";
-          setTimeout(()=>{ overlay.remove(); setTransiting(false); },580);
-        },60);
-      }
-    };
-    requestAnimationFrame(expandAnim);
+    // 広がる
+    overlay.style.transition="opacity .5s cubic-bezier(.4,0,.2,1), clip-path .6s cubic-bezier(.4,0,.2,1)";
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        overlay.style.opacity="1";
+        overlay.style.clipPath="circle(120% at 50% 50%)";
+      });
+    });
+
+    // 覆いきったらページ切り替え→引く
+    setTimeout(()=>{
+      window.scrollTo({top:0});
+      setPage(dest);
+      setVisPage(dest);
+      overlay.style.transition="opacity .55s cubic-bezier(.4,0,.6,1), clip-path .55s cubic-bezier(.4,0,.6,1)";
+      overlay.style.opacity="0";
+      overlay.style.clipPath="circle(0% at 50% 50%)";
+      setTimeout(()=>{ overlay.remove(); setTransiting(false); },580);
+    },680);
   };
   const openNovel=n=>{ setNovel(n); nav("detail"); };
   const openChapter=id=>{ setChapterId(id); nav("reading"); };
