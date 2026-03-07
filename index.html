@@ -495,6 +495,12 @@ function Styles({site}){
     @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
     @keyframes driftDown{0%{transform:translateY(-120px)}100%{transform:translateY(100vh)}}
     /* ページ遷移オーバーレイ */
+    @keyframes ptColAppear{0%{transform:scaleY(0);transform-origin:top}100%{transform:scaleY(1);transform-origin:top}}
+    @keyframes ptColFade{0%{opacity:1}100%{opacity:0}}
+    @keyframes ptGridFadeOut{0%{opacity:1}60%{opacity:.7}100%{opacity:0}}
+    .pt-grid-overlay{position:fixed;inset:0;z-index:8000;pointer-events:none;display:flex;flex-direction:row-reverse;align-items:stretch}
+    .pt-grid-col{height:100%;display:flex;flex-direction:column;opacity:0}
+    .pt-grid-cell{border:1px solid;flex-shrink:0}
     .pt-overlay{position:fixed;inset:0;z-index:8000;pointer-events:none;overflow:hidden}
     .pt-ink{position:absolute;inset:0;background:var(--bg);transform-origin:center;opacity:0}
     .pt-slide{position:absolute;inset:0;background:var(--bg);transform:translateX(-100%)}
@@ -1446,29 +1452,54 @@ function App(){
     if(transiting||p===visPage) return;
     setTransiting(true);
 
-    // 墨オーバーレイを生成
-    const overlay=document.createElement("div");
-    overlay.className="pt-overlay";
-    const ink=document.createElement("div");
-    ink.className="pt-ink";
-    // 染まる：中央から広がるradial-gradientでじわっと
-    ink.style.cssText=`
-      background: radial-gradient(circle at 50% 48%, var(--bg) 0%, var(--bg) 100%);
-      opacity:0;
-      animation: ptInkIn 1.0s cubic-bezier(.4,0,.2,1) forwards;
-    `;
-    overlay.appendChild(ink);
+    const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim()||"#07070f";
+    const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()||"#c8a86a";
+
+    // マス目サイズ
+    const CELL = 28;
+    const cols = Math.ceil(window.innerWidth / CELL) + 1;
+    const rows = Math.ceil(window.innerHeight / CELL);
+
+    const overlay = document.createElement("div");
+    overlay.className = "pt-grid-overlay";
+    overlay.style.cssText = `background:transparent`;
+
+    // 右端から左へ列を順番に出現させる
+    for(let ci=0; ci<cols; ci++){
+      const col = document.createElement("div");
+      col.className = "pt-grid-col";
+      col.style.width = CELL+"px";
+
+      for(let ri=0; ri<rows; ri++){
+        const cell = document.createElement("div");
+        cell.className = "pt-grid-cell";
+        cell.style.cssText = `width:${CELL}px;height:${CELL}px;background:${bg};border-color:${accent}22;box-sizing:border-box`;
+        col.appendChild(cell);
+      }
+
+      // 列ごとに遅延して出現（右端=ci=0から）
+      const delay = ci * 38; // ms
+      col.style.animation = `ptColAppear .45s ${delay}ms cubic-bezier(.4,0,.2,1) forwards`;
+      col.style.opacity = "1";
+      col.style.transform = "scaleY(0)";
+      col.style.transformOrigin = "top";
+      overlay.appendChild(col);
+    }
+
     document.body.appendChild(overlay);
 
-    // 染まりきったらページ切り替え
+    // 全列が出揃うタイミング（最後の列 + アニメ時間）
+    const coverTime = cols * 38 + 480;
+
     setTimeout(()=>{
       window.scrollTo({top:0});
       setPage(p);
       setVisPage(p);
-      // 墨が引く
-      ink.style.animation="ptInkOut .85s cubic-bezier(.4,0,.2,1) forwards";
-      setTimeout(()=>{ overlay.remove(); setTransiting(false); }, 900);
-    }, 1050);
+
+      // 全体をフェードアウト
+      overlay.style.animation = `ptGridFadeOut .9s cubic-bezier(.4,0,.2,1) forwards`;
+      setTimeout(()=>{ overlay.remove(); setTransiting(false); }, 950);
+    }, coverTime);
   };
   const openNovel=n=>{ setNovel(n); nav("detail"); };
   const openChapter=id=>{ setChapterId(id); nav("reading"); };
