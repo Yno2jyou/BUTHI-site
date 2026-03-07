@@ -1604,6 +1604,7 @@ function App(){
     <>
       <Styles site={site}/>
       <div className="app">
+        <BgTextLayer novels={novels}/>
         {loading&&(
           <div style={{position:"fixed",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"var(--bg)",zIndex:9000,gap:20}}>
             <div style={{fontFamily:"var(--serif)",fontSize:32,color:"var(--accent)",letterSpacing:"0.12em"}}>{site.name||"文藻"}</div>
