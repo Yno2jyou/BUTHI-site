@@ -1377,8 +1377,11 @@ function BgTextLayer({novels}){
     const count = Math.min(maxSlots, shuffled.length);
     const slots = Array.from({length:maxSlots},(_,i)=>i).sort(()=>Math.random()-.5).slice(0,count);
 
+    // …を縦書き中央表示用の縦三点リーダー（︙）に変換
+    const toVertical = s => s.replace(/…/g, "︙").replace(/‥/g, "︰");
+
     const result = slots.map((slot,i)=>({
-      text: shuffled[i],
+      text: toVertical(shuffled[i]),
       left: slot * SLOT_W + 8,
       goUp: Math.random()>.5,
       dur:  44 + Math.random()*26,
