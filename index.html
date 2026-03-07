@@ -495,6 +495,12 @@ function Styles({site}){
     @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
     @keyframes driftDown{0%{transform:translateY(-120px)}100%{transform:translateY(100vh)}}
     /* ページ遷移オーバーレイ */
+    .pt-overlay{position:fixed;inset:0;z-index:8000;pointer-events:none;display:flex;align-items:center;justify-content:center;background:transparent}
+    .pt-ink-bg{position:absolute;inset:0;background:var(--bg);opacity:0}
+    .pt-kanji-svg{position:relative;z-index:1}
+    @keyframes ptBgIn{0%{opacity:0}100%{opacity:1}}
+    @keyframes ptBgOut{0%{opacity:1}100%{opacity:0}}
+    @keyframes ptKanjiOut{0%{opacity:1}50%{opacity:.6}100%{opacity:0}}
     @keyframes ptColAppear{0%{transform:scaleY(0);transform-origin:top}100%{transform:scaleY(1);transform-origin:top}}
     @keyframes ptColFade{0%{opacity:1}100%{opacity:0}}
     @keyframes ptGridFadeOut{0%{opacity:1}60%{opacity:.7}100%{opacity:0}}
@@ -1452,55 +1458,100 @@ function App(){
     if(transiting||p===visPage) return;
     setTransiting(true);
 
-    const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim()||"#07070f";
-    const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()||"#c8a86a";
+    const overlay=document.createElement("div");
+    overlay.className="pt-overlay";
 
-    // マス目サイズ
-    const CELL = 28;
-    const cols = Math.ceil(window.innerWidth / CELL) + 1;
-    const rows = Math.ceil(window.innerHeight / CELL);
+    // 墨背景
+    const inkBg=document.createElement("div");
+    inkBg.className="pt-ink-bg";
+    overlay.appendChild(inkBg);
 
-    const overlay = document.createElement("div");
-    overlay.className = "pt-grid-overlay";
-    overlay.style.cssText = `background:transparent`;
+    // SVG：「淵」の字をCanvas→SVGで描く
+    // Canvasに描いてピクセルデータからSVGパスを生成する方式
+    const SIZE=220;
+    const canvas=document.createElement("canvas");
+    canvas.width=SIZE; canvas.height=SIZE;
+    const ctx=canvas.getContext("2d");
+    ctx.fillStyle="#fff";
+    ctx.font=`${SIZE*.92}px serif`;
+    ctx.textAlign="center";
+    ctx.textBaseline="middle";
+    ctx.fillText("淵",SIZE/2,SIZE/2+SIZE*.04);
+    const imgData=ctx.getImageData(0,0,SIZE,SIZE).data;
 
-    // 右端から左へ列を順番に出現させる
-    for(let ci=0; ci<cols; ci++){
-      const col = document.createElement("div");
-      col.className = "pt-grid-col";
-      col.style.width = CELL+"px";
-
-      for(let ri=0; ri<rows; ri++){
-        const cell = document.createElement("div");
-        cell.className = "pt-grid-cell";
-        cell.style.cssText = `width:${CELL}px;height:${CELL}px;background:${bg};border-color:${accent}22;box-sizing:border-box`;
-        col.appendChild(cell);
+    // ピクセルをサンプリングして点群を作る
+    const points=[];
+    const step=4;
+    for(let y=0;y<SIZE;y+=step){
+      for(let x=0;x<SIZE;x+=step){
+        const i=(y*SIZE+x)*4;
+        if(imgData[i+3]>80) points.push([x,y]);
       }
-
-      // 列ごとに遅延して出現（右端=ci=0から）
-      const delay = ci * 38; // ms
-      col.style.animation = `ptColAppear .45s ${delay}ms cubic-bezier(.4,0,.2,1) forwards`;
-      col.style.opacity = "1";
-      col.style.transform = "scaleY(0)";
-      col.style.transformOrigin = "top";
-      overlay.appendChild(col);
     }
 
+    // SVGを生成：各点を「四方からランダム位置からアニメで集まる線」として描画
+    const svgNS="http://www.w3.org/2000/svg";
+    const svg=document.createElementNS(svgNS,"svg");
+    svg.setAttribute("width",SIZE);
+    svg.setAttribute("height",SIZE);
+    svg.setAttribute("viewBox",`0 0 ${SIZE} ${SIZE}`);
+    svg.className="pt-kanji-svg";
+    svg.style.cssText="filter:drop-shadow(0 0 8px var(--accent))";
+
+    const accent=getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()||"#c8a86a";
+
+    // 点群を線として描く：startは画面外のランダム位置
+    const totalDur=900; // ms、全点が揃うまで
+    points.forEach((pt,i)=>{
+      const frac=i/points.length;
+      const delay=frac*totalDur*0.7;
+      const dur=280+Math.random()*200;
+      // 開始位置（四方からランダム）
+      const edge=Math.floor(Math.random()*4);
+      let sx,sy;
+      if(edge===0){sx=Math.random()*SIZE;sy=-30;}
+      else if(edge===1){sx=SIZE+30;sy=Math.random()*SIZE;}
+      else if(edge===2){sx=Math.random()*SIZE;sy=SIZE+30;}
+      else{sx=-30;sy=Math.random()*SIZE;}
+
+      const line=document.createElementNS(svgNS,"line");
+      line.setAttribute("x1",sx);line.setAttribute("y1",sy);
+      line.setAttribute("x2",sx);line.setAttribute("y2",sy);
+      line.setAttribute("stroke",accent);
+      line.setAttribute("stroke-width","1.2");
+      line.setAttribute("opacity","0");
+      svg.appendChild(line);
+
+      // アニメ：delayms後に終点へ移動
+      setTimeout(()=>{
+        line.setAttribute("opacity","0.85");
+        line.style.transition=`x2 ${dur}ms cubic-bezier(.4,0,.2,1),y2 ${dur}ms cubic-bezier(.4,0,.2,1)`;
+        line.setAttribute("x2",pt[0]);
+        line.setAttribute("y2",pt[1]);
+      },delay);
+    });
+
+    overlay.appendChild(svg);
     document.body.appendChild(overlay);
 
-    // 全列が出揃うタイミング（最後の列 + アニメ時間）
-    const coverTime = cols * 38 + 480;
+    // 字が完成したら墨で覆う
+    const coverDelay=totalDur*0.7+500;
+    setTimeout(()=>{
+      inkBg.style.animation="ptBgIn .9s cubic-bezier(.4,0,.2,1) forwards";
+      svg.style.animation="ptKanjiOut .6s .2s cubic-bezier(.4,0,.2,1) forwards";
+    },coverDelay);
 
+    // ページ切り替え
+    const switchDelay=coverDelay+950;
     setTimeout(()=>{
       window.scrollTo({top:0});
       setPage(p);
       setVisPage(p);
-
-      // 全体をフェードアウト
-      overlay.style.animation = `ptGridFadeOut .9s cubic-bezier(.4,0,.2,1) forwards`;
-      setTimeout(()=>{ overlay.remove(); setTransiting(false); }, 950);
-    }, coverTime);
+      inkBg.style.animation="ptBgOut .85s cubic-bezier(.4,0,.2,1) forwards";
+      setTimeout(()=>{ overlay.remove(); setTransiting(false); },900);
+    },switchDelay);
   };
+
   const openNovel=n=>{ setNovel(n); nav("detail"); };
   const openChapter=id=>{ setChapterId(id); nav("reading"); };
   const liveNovel=novel?novels.find(n=>n.id===novel.id)||novel:null;
