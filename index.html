@@ -465,7 +465,7 @@ function Styles({site, lightMode}){
     .alist{display:flex;flex-direction:column;gap:1px;background:var(--border);margin-bottom:24px}
     .arow{background:var(--bg);display:flex;align-items:center;gap:16px;padding:16px 18px;transition:background .2s}.arow:hover{background:var(--deep)}
     .arow-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-    .arow-info{flex:1;min-width:0}.arow-title{font-size:15px;color:var(--txt);letter-spacing:.04em;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.arow-meta{font-size:11px;color:var(--txt3)}
+    .arow-info{flex:1;min-width:0}.arow-title{font-size:14px;color:var(--txt);letter-spacing:.04em;margin-bottom:3px;word-break:break-all}.arow-meta{font-size:11px;color:var(--txt3)}
     .arow-actions{display:flex;gap:8px;flex-shrink:0}
     .icon-btn{background:none;border:1px solid var(--border);color:var(--txt3);padding:6px 10px;cursor:pointer;font-size:13px;border-radius:2px;transition:all .2s}.icon-btn:hover{border-color:var(--border-hi);color:var(--txt2)}.icon-btn.danger:hover{border-color:#ef4444;color:#ef4444}.icon-btn.primary{border-color:var(--accent);color:var(--accent)}.icon-btn.primary:hover{background:var(--accent-dim)}
     .ch-list{display:flex;flex-direction:column;gap:1px;background:var(--border);margin-bottom:16px}.ch-row{background:var(--bg);display:flex;align-items:center;gap:12px;padding:14px 16px}.ch-row:hover{background:var(--deep)}.ch-num{font-family:var(--serif);font-size:11px;color:var(--txt3);width:28px;flex-shrink:0}.ch-txt{flex:1;font-size:13px;color:var(--txt2)}
@@ -1029,7 +1029,7 @@ function AdminPanel({store,onClose}){
   return(
     <div className={`admin-overlay fadein${menuSelected?" menu-selected":""}`}>
       <div className="admin-sidebar">
-        <div className="admin-logo"><div className="admin-logo-txt">管理パネル</div><div className="admin-logo-sub">Admin Panel</div></div>
+        <div className="admin-logo" onClick={onClose} style={{cursor:"pointer"}} title="閲覧ページに戻る"><div className="admin-logo-txt">管理パネル</div><div className="admin-logo-sub" style={{letterSpacing:".2em"}}>← tap to exit</div></div>
         <nav className="admin-nav">
           <div className="admin-nav-group">
             <span className="admin-nav-label">設定</span>
