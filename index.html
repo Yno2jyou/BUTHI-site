@@ -623,8 +623,8 @@ function Nav({page,onNav,site,onLogoClick,lightMode,onToggleLight}){
         <button className={`nav-btn ${page==="hitorigoto"?"active":""}`} onClick={()=>onNav("hitorigoto")}>ひとりごと</button>
         <button className={`nav-btn ${page==="profile"?"active":""}`} onClick={()=>onNav("profile")}>著者</button>
       </div>
-      <button onClick={onToggleLight} title={lightMode?"ダークモード":"ライトモード"} style={{background:"none",border:"1px solid var(--border)",borderRadius:20,padding:"4px 12px",cursor:"pointer",fontSize:14,color:"var(--txt2)",lineHeight:1,transition:"all .2s"}}>
-        {lightMode?"🌙":"☀️"}
+      <button onClick={onToggleLight} style={{background:"none",border:"1px solid var(--border)",borderRadius:20,padding:"4px 14px",cursor:"pointer",fontSize:10,letterSpacing:".18em",color:"var(--txt2)",lineHeight:1.6,transition:"all .2s"}}>
+        {lightMode?"DARK":"LIGHT"}
       </button>
     </nav>
   );
