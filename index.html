@@ -1230,25 +1230,27 @@ function AdminPanel({store,onClose}){
                 };
                 return ordered.map((n,idx)=>(
                   <div key={n.id} className="arow">
-                    <div style={{display:"flex",flexDirection:"column",gap:2,marginRight:6}}>
-                      <button className="icon-btn" style={{fontSize:10,padding:"1px 5px",lineHeight:1.4}} disabled={idx===0} onClick={()=>moveNovel(n.id,-1)}>▲</button>
-                      <button className="icon-btn" style={{fontSize:10,padding:"1px 5px",lineHeight:1.4}} disabled={idx===ordered.length-1} onClick={()=>moveNovel(n.id,1)}>▼</button>
-                    </div>
-                    <div className="arow-dot" style={{background:n.accent,boxShadow:`0 0 8px ${n.accent}66`}}/>
-                    <div className="arow-info">
-                      <div className="arow-title">
-                        {n.pinned&&<span style={{marginRight:6,fontSize:11}}>📌</span>}
-                        {n.locked&&<span style={{marginRight:6,fontSize:11}}>🔒</span>}
-                        {n.title}
+                    <div className="arow-top">
+                      <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
+                        <button className="icon-btn" style={{fontSize:10,padding:"1px 5px",lineHeight:1.4}} disabled={idx===0} onClick={()=>moveNovel(n.id,-1)}>▲</button>
+                        <button className="icon-btn" style={{fontSize:10,padding:"1px 5px",lineHeight:1.4}} disabled={idx===ordered.length-1} onClick={()=>moveNovel(n.id,1)}>▼</button>
                       </div>
-                      <div className="arow-meta">{n.author} · {(n.chapters||[]).length}章 · {fmtCount(countChars(n))}</div>
+                      <div className="arow-dot" style={{background:n.accent,boxShadow:`0 0 8px ${n.accent}66`,flexShrink:0}}/>
+                      <div className="arow-info">
+                        <div className="arow-title">{n.title}</div>
+                        <div className="arow-meta">{n.author} · {(n.chapters||[]).length}章 · {fmtCount(countChars(n))}</div>
+                      </div>
+                      <div className="arow-actions">
+                        <button className={`icon-btn ${n.pinned?"primary":""}`} title={n.pinned?"固定解除":"先頭に固定"} onClick={()=>updateNovel(n.id,{pinned:!n.pinned})}>{n.pinned?"📌":"📌"}</button>
+                        <button className={`icon-btn ${n.locked?"danger":""}`} title={n.locked?"ロック解除":"削除ロック"} onClick={()=>updateNovel(n.id,{locked:!n.locked})}>{n.locked?"🔒":"🔓"}</button>
+                        <button className="icon-btn primary" onClick={()=>{ setEditNid(n.id); setSec("novel_edit"); setMenuSelected(true); }}>✏️ 編集</button>
+                        <button className="icon-btn danger" disabled={!!n.locked} style={{opacity:n.locked?.3:1,cursor:n.locked?"not-allowed":"pointer"}} onClick={()=>!n.locked&&setDelConfirm({type:"novel",id:n.id,label:n.title})}>🗑</button>
+                      </div>
                     </div>
-                    <div className="arow-actions">
-                      <button className={`icon-btn ${n.pinned?"primary":""}`} title={n.pinned?"固定解除":"先頭に固定"} onClick={()=>updateNovel(n.id,{pinned:!n.pinned})}>{n.pinned?"📌":"📌"}</button>
-                      <button className={`icon-btn ${n.locked?"danger":""}`} title={n.locked?"ロック解除":"削除ロック"} onClick={()=>updateNovel(n.id,{locked:!n.locked})}>{n.locked?"🔒":"🔓"}</button>
-                      <button className="icon-btn primary" onClick={()=>{ setEditNid(n.id); setSec("novel_edit"); setMenuSelected(true); }}>✏️ 編集</button>
-                      <button className="icon-btn danger" disabled={!!n.locked} style={{opacity:n.locked?.3:1,cursor:n.locked?"not-allowed":"pointer"}} onClick={()=>!n.locked&&setDelConfirm({type:"novel",id:n.id,label:n.title})}>🗑</button>
-                    </div>
+                    {(n.pinned||n.locked)&&<div style={{display:"flex",gap:6,paddingLeft:52,fontSize:11,color:"var(--txt3)"}}>
+                      {n.pinned&&<span>📌 固定中</span>}
+                      {n.locked&&<span>🔒 ロック中</span>}
+                    </div>}
                   </div>
                 ));
               })()}
