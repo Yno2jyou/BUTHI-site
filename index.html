@@ -463,11 +463,11 @@ function Styles({site, lightMode}){
     .gp-title{position:absolute;bottom:16px;left:20px;font-family:var(--serif);font-size:20px;font-weight:300;color:#e8e4de;letter-spacing:.06em;text-shadow:0 1px 6px rgba(0,0,0,.7);line-height:1.2}
     .gp-subtitle{position:absolute;bottom:16px;left:20px;font-family:var(--serif);font-size:20px;font-weight:300;color:#e8e4de;letter-spacing:.06em;text-shadow:0 1px 6px rgba(0,0,0,.7);line-height:1.2}
     .alist{display:flex;flex-direction:column;gap:1px;background:var(--border);margin-bottom:24px}
-    .arow{background:var(--bg);display:flex;flex-direction:column;gap:8px;padding:14px 18px;transition:background .2s}.arow:hover{background:var(--deep)}
+    .arow{background:var(--bg);display:flex;flex-direction:column;gap:10px;padding:14px 18px;transition:background .2s}.arow:hover{background:var(--deep)}
     .arow-top{display:flex;align-items:center;gap:10px;width:100%}
     .arow-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-    .arow-info{flex:1;min-width:0}.arow-title{font-size:14px;color:var(--txt);letter-spacing:.04em;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.arow-meta{font-size:11px;color:var(--txt3)}
-    .arow-actions{display:flex;gap:6px;flex-shrink:0;margin-left:auto}
+    .arow-info{flex:1;min-width:0}.arow-title{font-size:14px;color:var(--txt);letter-spacing:.04em;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.arow-meta{font-size:11px;color:var(--txt3);line-height:1.6}
+    .arow-actions{display:flex;gap:6px;flex-shrink:0;padding-left:18px}
     .icon-btn{background:none;border:1px solid var(--border);color:var(--txt3);padding:6px 10px;cursor:pointer;font-size:13px;border-radius:2px;transition:all .2s}.icon-btn:hover{border-color:var(--border-hi);color:var(--txt2)}.icon-btn.danger:hover{border-color:#ef4444;color:#ef4444}.icon-btn.primary{border-color:var(--accent);color:var(--accent)}.icon-btn.primary:hover{background:var(--accent-dim)}
     .ch-list{display:flex;flex-direction:column;gap:1px;background:var(--border);margin-bottom:16px}.ch-row{background:var(--bg);display:flex;align-items:center;gap:12px;padding:14px 16px}.ch-row:hover{background:var(--deep)}.ch-num{font-family:var(--serif);font-size:11px;color:var(--txt3);width:28px;flex-shrink:0}.ch-txt{flex:1;font-size:13px;color:var(--txt2)}
     .save-bar{position:fixed;bottom:0;left:260px;right:0;z-index:900;padding:14px 48px;background:var(--deep);border-top:1px solid var(--border);display:flex;align-items:center}
@@ -1238,20 +1238,20 @@ function AdminPanel({store,onClose}){
                       </div>
                       <div className="arow-dot" style={{background:n.accent,boxShadow:`0 0 8px ${n.accent}66`,flexShrink:0}}/>
                       <div className="arow-info">
-                        <div className="arow-title">{n.title}</div>
+                        <div className="arow-title">
+                          {n.pinned&&<span style={{fontSize:11,marginRight:4}}>📌</span>}
+                          {n.locked&&<span style={{fontSize:11,marginRight:4}}>🔒</span>}
+                          {n.title}
+                        </div>
                         <div className="arow-meta">{n.author} · {(n.chapters||[]).length}章 · {fmtCount(countChars(n))}</div>
                       </div>
-                      <div className="arow-actions">
-                        <button className={`icon-btn ${n.pinned?"primary":""}`} title={n.pinned?"固定解除":"先頭に固定"} onClick={()=>updateNovel(n.id,{pinned:!n.pinned})}>{n.pinned?"📌":"📌"}</button>
-                        <button className={`icon-btn ${n.locked?"danger":""}`} title={n.locked?"ロック解除":"削除ロック"} onClick={()=>updateNovel(n.id,{locked:!n.locked})}>{n.locked?"🔒":"🔓"}</button>
-                        <button className="icon-btn primary" onClick={()=>{ setEditNid(n.id); setSec("novel_edit"); setMenuSelected(true); }}>✏️ 編集</button>
-                        <button className="icon-btn danger" disabled={!!n.locked} style={{opacity:n.locked?.3:1,cursor:n.locked?"not-allowed":"pointer"}} onClick={()=>!n.locked&&setDelConfirm({type:"novel",id:n.id,label:n.title})}>🗑</button>
-                      </div>
                     </div>
-                    {(n.pinned||n.locked)&&<div style={{display:"flex",gap:6,paddingLeft:52,fontSize:11,color:"var(--txt3)"}}>
-                      {n.pinned&&<span>📌 固定中</span>}
-                      {n.locked&&<span>🔒 ロック中</span>}
-                    </div>}
+                    <div className="arow-actions">
+                      <button className={`icon-btn ${n.pinned?"primary":""}`} onClick={()=>updateNovel(n.id,{pinned:!n.pinned})}>{n.pinned?"📌":"📌"} {n.pinned?"固定解除":"固定"}</button>
+                      <button className={`icon-btn ${n.locked?"danger":""}`} onClick={()=>updateNovel(n.id,{locked:!n.locked})}>{n.locked?"🔒":"🔓"} {n.locked?"解除":"ロック"}</button>
+                      <button className="icon-btn primary" onClick={()=>{ setEditNid(n.id); setSec("novel_edit"); setMenuSelected(true); }}>✏️ 編集</button>
+                      <button className="icon-btn danger" disabled={!!n.locked} style={{opacity:n.locked?.3:1,cursor:n.locked?"not-allowed":"pointer"}} onClick={()=>!n.locked&&setDelConfirm({type:"novel",id:n.id,label:n.title})}>🗑</button>
+                    </div>
                   </div>
                 ));
               })()}
