@@ -315,8 +315,9 @@ function Styles({site, lightMode}){
   const border= lightMode?"rgba(0,0,0,.1)":"rgba(255,255,255,.06)";
   const borderHi=lightMode?"rgba(0,0,0,.18)":"rgba(255,255,255,.14)";
   const navBg = lightMode?"rgba(245,240,232,.92)":"rgba(7,7,15,.9)";
+  const mix=lightMode?"aaa":"888";
   return React.createElement('style',null,`
-    :root{--bg:${bg};--deep:color-mix(in srgb,${bg} 88%,#${lightMode?"aaa":"888"} 12%);--surface:color-mix(in srgb,${bg} 80%,#${lightMode?"aaa":"888"} 20%);--raised:color-mix(in srgb,${bg} 72%,#${lightMode?"aaa":"888"} 28%);--txt:${txt};--txt2:${txt2};--txt3:${txt3};--border:${border};--border-hi:${borderHi};--accent:${accent};--accent-glow:${accent}2a;--accent-dim:${accent}14;--serif:${font};--body:'Noto Serif JP',serif;--nav-bg:${navBg}}
+    :root{--bg:${bg};--deep:color-mix(in srgb,${bg} 88%,#${mix} 12%);--surface:color-mix(in srgb,${bg} 80%,#${mix} 20%);--raised:color-mix(in srgb,${bg} 72%,#${mix} 28%);--txt:${txt};--txt2:${txt2};--txt3:${txt3};--border:${border};--border-hi:${borderHi};--accent:${accent};--accent-glow:${accent}2a;--accent-dim:${accent}14;--serif:${font};--body:'Noto Serif JP',serif;--nav-bg:${navBg}}
     html{scroll-behavior:smooth}body{background:var(--bg);overflow-x:hidden}
     .app{min-height:100vh;background:var(--bg);color:var(--txt);font-family:var(--body)}
     .nav{position:relative;z-index:10}.hero{position:relative;z-index:10}.section{position:relative;z-index:10}.detail-body{position:relative;z-index:10}.reading-wrap{position:relative;z-index:10}
