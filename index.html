@@ -304,18 +304,25 @@ function fmtDate(iso){
 }
 
 // ═══════════════ STYLES ═══════════════
-function Styles({site}){
+function Styles({site, lightMode}){
   const accent=site.theme?.accent||"#c8a86a";
-  const bg=site.theme?.bg||"#07070f";
+  const bg=lightMode?"#f5f0e8":(site.theme?.bg||"#07070f");
   const font=site.theme?.font==="gothic"?"'Noto Sans JP',sans-serif":"'Cormorant Garamond','Noto Serif JP',serif";
+  // ライトモード時はテキスト色を反転
+  const txt   = lightMode?"#1a1814":"#e2ddd4";
+  const txt2  = lightMode?"#5c5650":"#8c8578";
+  const txt3  = lightMode?"#9c9890":"#4a4840";
+  const border= lightMode?"rgba(0,0,0,.1)":"rgba(255,255,255,.06)";
+  const borderHi=lightMode?"rgba(0,0,0,.18)":"rgba(255,255,255,.14)";
+  const navBg = lightMode?"rgba(245,240,232,.92)":"rgba(7,7,15,.9)";
   return React.createElement('style',null,`
-    :root{--bg:${bg};--deep:color-mix(in srgb,${bg} 88%,#888 12%);--surface:color-mix(in srgb,${bg} 80%,#888 20%);--raised:color-mix(in srgb,${bg} 72%,#888 28%);--txt:#e2ddd4;--txt2:#8c8578;--txt3:#4a4840;--border:rgba(255,255,255,.06);--border-hi:rgba(255,255,255,.14);--accent:${accent};--accent-glow:${accent}2a;--accent-dim:${accent}14;--serif:${font};--body:'Noto Serif JP',serif}
+    :root{--bg:${bg};--deep:color-mix(in srgb,${bg} 88%,#${lightMode?"aaa":"888"} 12%);--surface:color-mix(in srgb,${bg} 80%,#${lightMode?"aaa":"888"} 20%);--raised:color-mix(in srgb,${bg} 72%,#${lightMode?"aaa":"888"} 28%);--txt:${txt};--txt2:${txt2};--txt3:${txt3};--border:${border};--border-hi:${borderHi};--accent:${accent};--accent-glow:${accent}2a;--accent-dim:${accent}14;--serif:${font};--body:'Noto Serif JP',serif;--nav-bg:${navBg}}
     html{scroll-behavior:smooth}body{background:var(--bg);overflow-x:hidden}
     .app{min-height:100vh;background:var(--bg);color:var(--txt);font-family:var(--body)}
     .nav{position:relative;z-index:10}.hero{position:relative;z-index:10}.section{position:relative;z-index:10}.detail-body{position:relative;z-index:10}.reading-wrap{position:relative;z-index:10}
     .app::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.03'/%3E%3C/svg%3E");pointer-events:none;z-index:9999}
     /* NAV */
-    .nav{position:fixed;top:0;left:0;right:0;z-index:500;height:60px;padding:0 40px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:rgba(7,7,15,.9);backdrop-filter:blur(20px)}
+    .nav{position:fixed;top:0;left:0;right:0;z-index:500;height:60px;padding:0 40px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:var(--nav-bg);backdrop-filter:blur(20px)}
     .nav-logo{cursor:pointer}.nav-logo-main{font-family:var(--serif);font-size:20px;font-weight:300;color:var(--accent);letter-spacing:.12em}.nav-logo-sub{font-size:8px;letter-spacing:.4em;color:var(--txt3);text-transform:uppercase;margin-top:1px}
     .nav-center{display:flex;gap:4px}
     .nav-btn{background:none;border:none;cursor:pointer;font-family:var(--body);font-size:10px;letter-spacing:.26em;text-transform:uppercase;color:var(--txt3);padding:6px 12px;border-radius:2px;transition:color .25s,background .25s}
@@ -603,7 +610,7 @@ function useReadingProgress(){
 }
 
 // ═══════════════ NAV ═══════════════
-function Nav({page,onNav,site,onLogoClick}){
+function Nav({page,onNav,site,onLogoClick,lightMode,onToggleLight}){
   return(
     <nav className="nav">
       <div className="nav-logo" onClick={()=>{ onNav("home"); if(onLogoClick)onLogoClick(); }}>
@@ -615,7 +622,9 @@ function Nav({page,onNav,site,onLogoClick}){
         <button className={`nav-btn ${page==="hitorigoto"?"active":""}`} onClick={()=>onNav("hitorigoto")}>ひとりごと</button>
         <button className={`nav-btn ${page==="profile"?"active":""}`} onClick={()=>onNav("profile")}>著者</button>
       </div>
-
+      <button onClick={onToggleLight} title={lightMode?"ダークモード":"ライトモード"} style={{background:"none",border:"1px solid var(--border)",borderRadius:20,padding:"4px 12px",cursor:"pointer",fontSize:14,color:"var(--txt2)",lineHeight:1,transition:"all .2s"}}>
+        {lightMode?"🌙":"☀️"}
+      </button>
     </nav>
   );
 }
@@ -1514,6 +1523,8 @@ function App(){
   const [adminOpen,setAdminOpen]=useState(false);
   const [showLogin,setShowLogin]=useState(false);
   const [authed,setAuthed]=useState(false);
+  const [lightMode,setLightMode]=useState(false);
+  const [lightMode,setLightMode]=useState(false);
 
   const [transiting,setTransiting]=useState(false);
   const [visPage,setVisPage]=useState("home");
@@ -1576,7 +1587,8 @@ function App(){
     const ov=document.createElement("div");
     document.body.appendChild(ov);
     TRANSITIONS[idx](ov,()=>{
-      window.scrollTo({top:0});
+      window.scrollTo({top:0,behavior:'instant'});
+      document.documentElement.scrollTop=0;
       setPage(dest);
       setVisPage(dest);
       setTimeout(()=>{
@@ -1627,7 +1639,7 @@ function App(){
 
   return(
     <>
-      <Styles site={site}/>
+      <Styles site={site} lightMode={lightMode}/>
       <div className="app">
         <BgTextLayer novels={novels}/>
         {loading&&(
@@ -1655,7 +1667,7 @@ function App(){
           </div>
         )}
         {!loading&&!dbError&&!adminOpen&&page!=="reading"&&(
-          <Nav page={page} onNav={nav} site={site} onLogoClick={handleLogoClick}/>
+          <Nav page={page} onNav={nav} site={site} onLogoClick={handleLogoClick} lightMode={lightMode} onToggleLight={()=>setLightMode(m=>!m)}/>
         )}
         {!loading&&!dbError&&!adminOpen&&page==="home"&&<HomePage site={site} novels={novels} onOpen={openNovel}/>}
         {!loading&&!dbError&&!adminOpen&&page==="hitorigoto"&&<HitorigotoPage author={author}/>}
