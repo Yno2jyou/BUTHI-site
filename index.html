@@ -510,23 +510,25 @@ function Styles({site}){
     .gallery-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--txt3);font-family:var(--body);font-size:10px;letter-spacing:.26em;text-transform:uppercase;padding:12px 20px;cursor:pointer;transition:all .25s;margin-bottom:-1px}
     .gallery-tab:hover{color:var(--txt2)}.gallery-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
     /* QUOTE STAGE */
-    .quote-stage{min-height:420px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;border:1px solid var(--border);margin-bottom:64px;overflow:hidden;cursor:pointer}
+    .quote-stage{min-height:380px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;border:1px solid var(--border);margin-bottom:64px;overflow:hidden;cursor:pointer}
     .quote-stage-bg{position:absolute;inset:0;opacity:.04;background:radial-gradient(ellipse at center,var(--accent),transparent 70%)}
-    .quote-stage-content{position:relative;padding:60px 80px;text-align:center;max-width:700px}
-    .quote-text{font-family:var(--serif);font-size:clamp(20px,3.5vw,32px);font-weight:300;color:var(--txt);line-height:1.8;letter-spacing:.06em;margin-bottom:32px;font-style:italic}
-    .quote-text::before{content:'「';color:var(--accent);opacity:.5;font-size:1.4em;line-height:0;vertical-align:-.2em}
-    .quote-text::after{content:'」';color:var(--accent);opacity:.5;font-size:1.4em;line-height:0;vertical-align:-.2em}
-    .quote-source{font-size:11px;letter-spacing:.28em;color:var(--txt3);text-transform:uppercase}
+    .quote-stage-content{position:relative;padding:60px 80px 80px;text-align:center;max-width:720px;width:100%}
+    .quote-text{font-family:var(--serif);font-size:clamp(16px,2.8vw,26px);font-weight:300;color:var(--txt);line-height:2;letter-spacing:.06em;font-style:italic;word-break:break-all;overflow-wrap:break-word}
+    .quote-before{color:var(--accent);opacity:.5;font-size:1.3em;line-height:0;vertical-align:-.15em;font-family:var(--serif)}
+    .quote-after{color:var(--accent);opacity:.5;font-size:1.3em;line-height:0;vertical-align:-.15em;font-family:var(--serif)}
+    .quote-source{font-size:11px;letter-spacing:.28em;color:var(--txt3);text-transform:uppercase;line-height:1.8}
     .quote-source span{color:var(--accent);margin:0 8px}
-    .quote-hint{position:absolute;bottom:20px;right:24px;font-size:9px;color:var(--txt3);letter-spacing:.2em}
-    .quote-dots{display:flex;gap:6px;margin-top:28px;justify-content:center}
+    .quote-reason{font-size:11px;color:var(--txt3);font-style:italic;margin-top:8px;letter-spacing:.04em;line-height:1.8}
+    .quote-hint{position:absolute;bottom:16px;right:20px;font-size:9px;color:var(--txt3);letter-spacing:.2em}
+    .quote-dots{display:flex;gap:6px;margin-top:24px;justify-content:center}
     .quote-dot{width:5px;height:5px;border-radius:50%;background:var(--border);transition:background .3s;cursor:pointer}.quote-dot.active{background:var(--accent)}
     /* QUOTE GRID */
     .quote-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1px;background:var(--border);margin-bottom:48px}
     .quote-card{background:var(--bg);padding:28px 30px;transition:background .3s}.quote-card:hover{background:var(--deep)}
-    .quote-card-text{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--txt);line-height:2;margin-bottom:16px}
-    .quote-card-source{font-size:10px;color:var(--txt3);letter-spacing:.2em;padding-top:14px;border-top:1px solid var(--border)}
+    .quote-card-text{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--txt);line-height:2.2;margin-bottom:14px;word-break:break-all;overflow-wrap:break-word;white-space:pre-line}
+    .quote-card-source{font-size:10px;color:var(--txt3);letter-spacing:.2em;padding-top:14px;border-top:1px solid var(--border);line-height:1.8}
     .quote-card-source b{color:var(--accent);font-weight:400}
+    .quote-card-reason{font-size:11px;color:var(--txt3);font-style:italic;margin-top:8px;line-height:1.8}
     /* CHARACTER */
     .char-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1px;background:var(--border)}
     .char-card{background:var(--bg);padding:30px 28px;transition:background .3s}.char-card:hover{background:var(--deep)}
@@ -535,7 +537,7 @@ function Styles({site}){
     .char-name{font-family:var(--serif);font-size:20px;font-weight:300;color:var(--txt);margin-bottom:3px}
     .char-role{font-size:9px;letter-spacing:.3em;color:var(--txt3);text-transform:uppercase}
     .char-novel{font-size:9px;letter-spacing:.2em;color:var(--accent);margin-top:3px}
-    .char-desc{font-size:13px;color:var(--txt2);line-height:2;margin-bottom:16px}
+    .char-desc{font-size:13px;color:var(--txt2);line-height:2.1;margin-bottom:16px;white-space:pre-line;word-break:break-all;overflow-wrap:break-word}
     .char-traits{display:flex;gap:6px;flex-wrap:wrap}
     .char-trait{font-size:9px;letter-spacing:.14em;border:1px solid var(--border);color:var(--txt3);padding:3px 9px}
     /* THEME / MOTIF SECTION */
@@ -543,13 +545,13 @@ function Styles({site}){
     .theme-card{background:var(--bg);padding:28px 28px;transition:background .3s}.theme-card:hover{background:var(--deep)}
     .theme-card-novel{font-size:9px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase;margin-bottom:10px}
     .theme-card-title{font-family:var(--serif);font-size:19px;font-weight:300;color:var(--txt);margin-bottom:12px;line-height:1.3}
-    .theme-card-desc{font-size:13px;color:var(--txt2);line-height:2}
+    .theme-card-desc{font-size:13px;color:var(--txt2);line-height:2.1;white-space:pre-line;word-break:break-all;overflow-wrap:break-word}
     .motif-list{display:flex;flex-direction:column;gap:1px;background:var(--border)}
-    .motif-row{background:var(--bg);padding:22px 28px;display:grid;grid-template-columns:160px 1fr;gap:24px;align-items:start;transition:background .3s}.motif-row:hover{background:var(--deep)}
-    .motif-keyword{font-family:var(--serif);font-size:22px;font-weight:300;color:var(--accent);letter-spacing:.04em}
-    .motif-works{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+    .motif-row{background:var(--bg);padding:24px 28px;display:grid;grid-template-columns:140px 1fr;gap:28px;align-items:start;transition:background .3s}.motif-row:hover{background:var(--deep)}
+    .motif-keyword{font-family:var(--serif);font-size:20px;font-weight:300;color:var(--accent);letter-spacing:.04em;word-break:break-all}
+    .motif-works{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
     .motif-work{font-size:8px;letter-spacing:.2em;color:var(--txt3);border:1px solid var(--border);padding:2px 7px}
-    .motif-desc{font-size:13px;color:var(--txt2);line-height:2}
+    .motif-desc{font-size:13px;color:var(--txt2);line-height:2.1;white-space:pre-line;word-break:break-all;overflow-wrap:break-word}
     /* TIMELINE */
     .timeline{position:relative;padding-left:48px}
     .timeline::before{content:'';position:absolute;left:12px;top:0;bottom:0;width:1px;background:var(--border)}
@@ -558,7 +560,7 @@ function Styles({site}){
     .timeline-year{font-size:9px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase;margin-bottom:6px}
     .timeline-title{font-family:var(--serif);font-size:21px;font-weight:300;color:var(--txt);margin-bottom:6px}
     .timeline-genre{font-size:9px;letter-spacing:.22em;color:var(--txt3);text-transform:uppercase;margin-bottom:10px}
-    .timeline-desc{font-size:13px;color:var(--txt2);line-height:2;max-width:600px}
+    .timeline-desc{font-size:13px;color:var(--txt2);line-height:2.1;max-width:600px;white-space:pre-line;word-break:break-all;overflow-wrap:break-word}
     .timeline-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
     .timeline-tag{font-size:8px;letter-spacing:.18em;color:var(--txt3);border:1px solid var(--border);padding:2px 7px}
     /* CORRELATION MAP */
@@ -941,201 +943,391 @@ function ProfilePage({author,novels,onToWorks,site,onSendMessage}){
   );
 }
 
-// ═══════════════ GALLERY ADMIN FORMS ═══════════════
-function GalleryQuoteForm({novels, gallery, setGallery, flash, saved}){
-  const [nt,setNt]=useState(""); const [nno,setNno]=useState(""); const [nch,setNch]=useState("");
-  const selNov=novels.find(n=>n.id===nno);
-  return(
-    <>
-      <div style={{background:"var(--surface)",border:"1px solid var(--border)",padding:20,borderRadius:2,marginBottom:24}}>
-        <div className="admin-title" style={{fontSize:16,marginBottom:16}}>＋ 新しい名文を追加</div>
-        <div className="form-group">
-          <label className="form-label">テキスト</label>
-          <textarea className="form-textarea" rows={4} value={nt} onChange={e=>setNt(e.target.value)} placeholder="本文中の名文・名言を入力…" style={{fontFamily:"'Noto Serif JP',serif",fontSize:14,lineHeight:2}}/>
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">作品を選択</label>
-            <select className="form-input" value={nno} onChange={e=>{setNno(e.target.value);setNch("");}}>
-              <option value="">-- 作品を選択 --</option>
-              {novels.map(n=><option key={n.id} value={n.id}>{n.title}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">章（任意）</label>
-            <select className="form-input" value={nch} onChange={e=>setNch(e.target.value)} disabled={!selNov}>
-              <option value="">-- 章を選択 --</option>
-              {(selNov?.chapters||[]).map(c=><option key={c.id} value={c.title}>{c.title}</option>)}
-            </select>
-          </div>
-        </div>
-        <button className="btn btn-primary" disabled={!nt.trim()||!nno} onClick={async()=>{
-          const nov=novels.find(n=>n.id===nno);
-          const newQ={id:`q${Date.now()}`,text:nt.trim(),novelId:nno,novelTitle:nov?.title||"",chapter:nch};
-          await flash(()=>setGallery(g=>({...g,quotes:[...(g.quotes||[]),newQ]})));
-          setNt(""); setNno(""); setNch("");
-        }}>追加する</button>
-        {saved&&<span style={{marginLeft:12,fontSize:12,color:"var(--accent)"}}>✓ 追加しました</span>}
-      </div>
-      <div className="msg-list">
-        {(gallery?.quotes||[]).length===0&&<div style={{padding:"16px",color:"var(--txt3)",fontSize:13}}>まだ名文が登録されていません</div>}
-        {(gallery?.quotes||[]).map((q,i)=>(
-          <div key={q.id} className="msg-row" style={{cursor:"default"}}>
-            <div className="msg-body" style={{fontFamily:"'Noto Serif JP',serif",fontStyle:"italic"}}>「{q.text}」</div>
-            <div style={{marginTop:6,fontSize:11,color:"var(--txt3)"}}>『{q.novelTitle}』 {q.chapter&&`/ ${q.chapter}`}</div>
-            <div className="msg-acts">
-              <button className="icon-btn danger" style={{fontSize:11,marginLeft:"auto"}} onClick={()=>
-                flash(()=>setGallery(g=>({...g,quotes:(g.quotes||[]).filter((_,j)=>j!==i)})))
-              }>🗑 削除</button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </>
-  );
+// ═══════════════ AI GALLERY ANALYSIS ═══════════════
+// Anthropic APIを使って全作品を精読・分析し、ギャラリーデータを自動生成する
+
+async function analyzeNovelsWithAI(novels) {
+  // 全作品の本文を結合してプロンプトを構築
+  const novelsText = novels.map(n => {
+    const chaptersText = (n.chapters || []).map(c =>
+      `【${c.title}】\n${c.content}`
+    ).join("\n\n");
+    return `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+■ 作品ID: ${n.id}
+■ タイトル: 『${n.title}』
+■ サブタイトル: ${n.subtitle || "なし"}
+■ ジャンル: ${n.genre}
+■ タグ: ${(n.tags || []).join("、")}
+■ あらすじ: ${n.description}
+■ 本文:
+${chaptersText || "（本文未入力）"}`;
+  }).join("\n\n");
+
+  const prompt = `あなたは文芸批評家・文学研究者として、以下の小説作品群を精読・分析してください。
+
+${novelsText}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+上記の作品群を精読した上で、以下の形式のJSONを返してください。
+JSONのみを返し、前後に説明文やMarkdownのコードブロック記号は一切含めないこと。
+
+{
+  "quotes": [
+    {
+      "id": "q1",
+      "text": "（作品本文から抜き出した印象的な一文または短い段落。改行は\\nで表現）",
+      "novelId": "（作品ID）",
+      "novelTitle": "（作品タイトル）",
+      "chapter": "（章タイトル）",
+      "reason": "（この文を選んだ文学的理由。50字程度）"
+    }
+  ],
+  "characters": [
+    {
+      "id": "c1",
+      "novelId": "（作品ID）",
+      "novelTitle": "（作品タイトル）",
+      "name": "（人物名）",
+      "role": "（役割：主人公/相棒/語り手/対話者 など）",
+      "accent": "（この人物を象徴する16進カラーコード。作品の雰囲気に合わせて）",
+      "description": "（この人物の内面・心理・象徴的意味の分析。100字程度。改行は\\nで）",
+      "traits": ["特性1", "特性2", "特性3"]
+    }
+  ],
+  "themes": [
+    {
+      "id": "t1",
+      "novelId": "（作品ID）",
+      "novelTitle": "（作品タイトル）",
+      "title": "（主題・テーマのタイトル）",
+      "description": "（そのテーマがどのように描かれているか、文学的考察。80字程度）"
+    }
+  ],
+  "motifs": [
+    {
+      "id": "m1",
+      "keyword": "（繰り返し現れるモチーフのキーワード）",
+      "description": "（このモチーフの文学的機能・象徴的意味の分析。80字程度）",
+      "novelIds": ["（このモチーフが現れる作品IDのリスト）"]
+    }
+  ],
+  "notes": "（作品群全体を俯瞰した、作風・文体・作者の姿勢に関する総括的な批評ノート。作者に語りかける形で。200字程度）"
 }
 
-function GalleryCharForm({novels, gallery, setGallery, flash, saved}){
-  const [cn,setCn]=useState(""); const [cr,setCr]=useState("主人公");
-  const [cno,setCno]=useState(""); const [cd,setCd]=useState("");
-  const [ct,setCt]=useState(""); const [ca,setCa]=useState("#c8a86a");
-  const caRef=useRef();
-  return(
-    <>
-      <div style={{background:"var(--surface)",border:"1px solid var(--border)",padding:20,borderRadius:2,marginBottom:24}}>
-        <div className="admin-title" style={{fontSize:16,marginBottom:16}}>＋ 新しいキャラクターを追加</div>
-        <div className="form-row">
-          <div className="form-group"><label className="form-label">名前</label><input className="form-input" value={cn} onChange={e=>setCn(e.target.value)} placeholder="キャラクター名"/></div>
-          <div className="form-group"><label className="form-label">役割</label><input className="form-input" value={cr} onChange={e=>setCr(e.target.value)} placeholder="主人公・相棒・敵対者…"/></div>
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">作品</label>
-            <select className="form-input" value={cno} onChange={e=>setCno(e.target.value)}>
-              <option value="">-- 作品を選択 --</option>
-              {novels.map(n=><option key={n.id} value={n.id}>{n.title}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">アクセント色</label>
-            <div className="color-row">
-              <div className="color-swatch" style={{background:ca}} onClick={()=>caRef.current?.click()}/>
-              <input ref={caRef} type="color" value={ca} onChange={e=>setCa(e.target.value)} className="color-input-hidden"/>
-              <input className="form-input" style={{flex:1}} value={ca} onChange={e=>setCa(e.target.value)}/>
-            </div>
-          </div>
-        </div>
-        <div className="form-group"><label className="form-label">解説・分析</label><textarea className="form-textarea" rows={4} value={cd} onChange={e=>setCd(e.target.value)} placeholder="キャラクターの内面・役割・象徴性など…"/></div>
-        <div className="form-group"><label className="form-label">特性（カンマ区切り）</label><input className="form-input" value={ct} onChange={e=>setCt(e.target.value)} placeholder="内省的, 孤独, 二重人格…"/></div>
-        <button className="btn btn-primary" disabled={!cn.trim()||!cno} onClick={async()=>{
-          const nov=novels.find(n=>n.id===cno);
-          const newC={id:`c${Date.now()}`,name:cn.trim(),role:cr.trim(),novelId:cno,novelTitle:nov?.title||"",description:cd.trim(),traits:ct.split(",").map(s=>s.trim()).filter(Boolean),accent:ca};
-          await flash(()=>setGallery(g=>({...g,characters:[...(g.characters||[]),newC]})));
-          setCn(""); setCr("主人公"); setCno(""); setCd(""); setCt(""); setCa("#c8a86a");
-        }}>追加する</button>
-        {saved&&<span style={{marginLeft:12,fontSize:12,color:"var(--accent)"}}>✓ 追加しました</span>}
-      </div>
-      <div className="alist">
-        {(gallery?.characters||[]).length===0&&<div style={{padding:"16px",color:"var(--txt3)",fontSize:13}}>キャラクターがまだ登録されていません</div>}
-        {(gallery?.characters||[]).map((c,i)=>(
-          <div key={c.id} className="arow">
-            <div className="arow-dot" style={{background:c.accent||"var(--accent)",boxShadow:`0 0 8px ${c.accent}66`}}/>
-            <div className="arow-info">
-              <div className="arow-title">{c.name} <span style={{fontSize:11,color:"var(--txt3)",fontWeight:400}}>（{c.role}）</span></div>
-              <div className="arow-meta">『{c.novelTitle}』 · {(c.traits||[]).join("・")}</div>
-            </div>
-            <button className="icon-btn danger" onClick={()=>flash(()=>setGallery(g=>({...g,characters:(g.characters||[]).filter((_,j)=>j!==i)})))}>🗑</button>
-          </div>
-        ))}
-      </div>
-    </>
-  );
+選出・分析の基準：
+- 名言・名文は各作品から2〜4文、文学的に価値が高く、読者の心に刺さる言葉を選ぶ
+- キャラクターは本文に実際に登場する人物のみ
+- 主題は各作品から2〜3つ、モチーフは作品横断的なものを含めて3〜6つ
+- すべて日本語で記述すること`;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 4000,
+      messages: [{ role: "user", content: prompt }]
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(()=>({}));
+    throw new Error(err.error?.message || `API Error ${response.status}`);
+  }
+
+  const data = await response.json();
+  const rawText = (data.content || []).map(b => b.text || "").join("");
+  // コードブロック・余分な文字を除去してパース
+  const cleaned = rawText.replace(/```json|```/g, "").trim();
+  return JSON.parse(cleaned);
 }
 
-function GalleryThemeForm({novels, gallery, setGallery, flash, saved}){
-  const [tt,setTt]=useState(""); const [td,setTd]=useState(""); const [tno,setTno]=useState("");
-  const [mk,setMk]=useState(""); const [md,setMd]=useState(""); const [mnids,setMnids]=useState([]);
+// ギャラリー管理パネル（AI分析ボタン + 結果編集）
+function GalleryAdminPanel({novels, gallery, setGallery, flash, saved, saving}){
+  const [analyzing, setAnalyzing] = useState(false);
+  const [progress, setProgress] = useState("");
+  const [error, setError] = useState("");
+  const [editTab, setEditTab] = useState("quotes");
+  const [editQuoteIdx, setEditQuoteIdx] = useState(null);
+  const [editCharIdx, setEditCharIdx] = useState(null);
+
+  const hasContent = novels.length > 0 && novels.some(n => (n.chapters||[]).some(c => c.content?.trim()));
+
+  const runAnalysis = async () => {
+    if (!hasContent) { setError("本文が入力された作品が必要です。"); return; }
+    setAnalyzing(true); setError(""); setProgress("AIが作品群を精読しています…");
+    try {
+      setProgress("全作品の本文・あらすじ・タグを読み込み中…");
+      await new Promise(r=>setTimeout(r,600));
+      setProgress("文学的分析を行っています（名言・人物・主題・モチーフ）…");
+      const result = await analyzeNovelsWithAI(novels);
+      setProgress("分析完了。Firestoreに保存しています…");
+      await new Promise(r=>setTimeout(r,300));
+      await flash(()=>setGallery(result));
+      setProgress("");
+    } catch(e) {
+      setError("分析中にエラーが発生しました：" + e.message);
+      setProgress("");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const quotes = gallery?.quotes || [];
+  const characters = gallery?.characters || [];
+  const themes = gallery?.themes || [];
+  const motifs = gallery?.motifs || [];
+
+  const tabStyle = (id) => ({
+    background:"none", border:"none", borderBottom:`2px solid ${editTab===id?"var(--accent)":"transparent"}`,
+    color: editTab===id?"var(--accent)":"var(--txt3)",
+    fontFamily:"var(--body)", fontSize:10, letterSpacing:".22em", textTransform:"uppercase",
+    padding:"10px 14px", cursor:"pointer", transition:"all .2s", marginBottom:-1,
+  });
+
   return(
-    <>
-      {/* 主題 */}
-      <div style={{background:"var(--surface)",border:"1px solid var(--border)",padding:20,borderRadius:2,marginBottom:24}}>
-        <div className="admin-title" style={{fontSize:16,marginBottom:16}}>＋ 主題を追加</div>
-        <div className="form-row">
-          <div className="form-group"><label className="form-label">主題タイトル</label><input className="form-input" value={tt} onChange={e=>setTt(e.target.value)} placeholder="自己同一性の崩壊"/></div>
-          <div className="form-group">
-            <label className="form-label">作品</label>
-            <select className="form-input" value={tno} onChange={e=>setTno(e.target.value)}>
-              <option value="">-- 作品を選択 --</option>
-              {novels.map(n=><option key={n.id} value={n.id}>{n.title}</option>)}
-            </select>
+    <div>
+      {/* ── AI分析ボタンブロック ── */}
+      <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:3,padding:28,marginBottom:32}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:20,marginBottom:20}}>
+          <div style={{fontSize:28,lineHeight:1}}>✦</div>
+          <div>
+            <div style={{fontFamily:"var(--serif)",fontSize:18,color:"var(--txt)",marginBottom:6,letterSpacing:".04em"}}>
+              AI 自動分析・登録
+            </div>
+            <div style={{fontSize:12,color:"var(--txt3)",lineHeight:2}}>
+              登録されたすべての作品を AI が精読し、<br/>
+              名言・名文／キャラクター解析／主題考察／モチーフ抽出を自動生成します。<br/>
+              作品が追加・更新されるたびに再実行してください。
+            </div>
           </div>
         </div>
-        <div className="form-group"><label className="form-label">考察・解説</label><textarea className="form-textarea" rows={3} value={td} onChange={e=>setTd(e.target.value)} placeholder="このテーマがなぜ重要か、どう描かれているか…"/></div>
-        <button className="btn btn-primary" disabled={!tt.trim()||!tno} onClick={async()=>{
-          const nov=novels.find(n=>n.id===tno);
-          const newT={id:`t${Date.now()}`,title:tt.trim(),description:td.trim(),novelId:tno,novelTitle:nov?.title||""};
-          await flash(()=>setGallery(g=>({...g,themes:[...(g.themes||[]),newT]})));
-          setTt(""); setTd(""); setTno("");
-        }}>追加する</button>
-        {saved&&<span style={{marginLeft:12,fontSize:12,color:"var(--accent)"}}>✓ 追加しました</span>}
-      </div>
-      <div className="alist" style={{marginBottom:32}}>
-        {(gallery?.themes||[]).length===0&&<div style={{padding:"16px",color:"var(--txt3)",fontSize:13}}>主題がまだ登録されていません</div>}
-        {(gallery?.themes||[]).map((th,i)=>(
-          <div key={th.id} className="arow">
-            <div className="arow-info">
-              <div className="arow-title">{th.title}</div>
-              <div className="arow-meta">『{th.novelTitle}』 · {(th.description||"").slice(0,40)}{th.description?.length>40?"…":""}</div>
+
+        {/* 対象作品 */}
+        {novels.length > 0 && (
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:9,letterSpacing:".28em",color:"var(--txt3)",textTransform:"uppercase",marginBottom:10}}>
+              分析対象作品
             </div>
-            <button className="icon-btn danger" onClick={()=>flash(()=>setGallery(g=>({...g,themes:(g.themes||[]).filter((_,j)=>j!==i)})))}>🗑</button>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {novels.map(n=>(
+                <div key={n.id} style={{display:"flex",alignItems:"center",gap:7,fontSize:12,color:"var(--txt2)",border:"1px solid var(--border)",padding:"4px 12px",borderRadius:2}}>
+                  <div style={{width:7,height:7,borderRadius:"50%",background:n.accent||"var(--accent)",boxShadow:`0 0 6px ${n.accent}66`,flexShrink:0}}/>
+                  <span>『{n.title}』</span>
+                  <span style={{color:"var(--txt3)",fontSize:10}}>
+                    {(n.chapters||[]).length}章
+                    {(n.chapters||[]).some(c=>c.content?.trim())
+                      ? <span style={{color:"var(--accent)",marginLeft:4}}>✓ 本文あり</span>
+                      : <span style={{color:"#ef4444",marginLeft:4}}>本文未入力</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
+        )}
+
+        {novels.length === 0 && (
+          <div style={{fontSize:12,color:"#ef4444",marginBottom:16}}>
+            作品が登録されていません。まず「作品管理」から作品と本文を追加してください。
+          </div>
+        )}
+
+        {/* 進捗・エラー */}
+        {analyzing && (
+          <div style={{marginBottom:16,padding:"14px 18px",background:"var(--accent-dim)",border:"1px solid var(--accent-glow)",borderRadius:2}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:16,height:16,borderRadius:"50%",border:"2px solid var(--accent)",borderTopColor:"transparent",animation:"spin 0.8s linear infinite",flexShrink:0}}/>
+              <span style={{fontSize:12,color:"var(--accent)",letterSpacing:".06em"}}>{progress}</span>
+            </div>
+            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+          </div>
+        )}
+        {error && (
+          <div style={{marginBottom:16,padding:"12px 16px",background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.3)",borderRadius:2,fontSize:12,color:"#f87171",lineHeight:1.8}}>
+            {error}
+          </div>
+        )}
+        {!analyzing && saved && (
+          <div style={{marginBottom:16,padding:"12px 16px",background:"var(--accent-dim)",border:"1px solid var(--accent-glow)",borderRadius:2,fontSize:12,color:"var(--accent)"}}>
+            ✓ 分析完了。ギャラリーデータを更新しました。
+          </div>
+        )}
+
+        <button
+          className={`btn ${hasContent&&!analyzing?"btn-primary":""}`}
+          disabled={!hasContent||analyzing}
+          onClick={runAnalysis}
+          style={{fontSize:12,letterSpacing:".16em",padding:"11px 28px"}}
+        >
+          {analyzing ? "⌛ 分析中…" : "✦ AIで全作品を精読・分析する"}
+        </button>
       </div>
 
-      {/* モチーフ */}
-      <div style={{background:"var(--surface)",border:"1px solid var(--border)",padding:20,borderRadius:2,marginBottom:24}}>
-        <div className="admin-title" style={{fontSize:16,marginBottom:16}}>＋ モチーフを追加</div>
-        <div className="form-group"><label className="form-label">キーワード</label><input className="form-input" value={mk} onChange={e=>setMk(e.target.value)} placeholder="鏡、夜明け前、名前のない主人公…"/></div>
-        <div className="form-group"><label className="form-label">解説</label><textarea className="form-textarea" rows={3} value={md} onChange={e=>setMd(e.target.value)} placeholder="このモチーフが作品群でどのように機能しているか…"/></div>
-        <div className="form-group">
-          <label className="form-label">関連作品（複数選択可）</label>
-          <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:8}}>
-            {novels.map(n=>(
-              <label key={n.id} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--txt2)",cursor:"pointer"}}>
-                <input type="checkbox" checked={mnids.includes(n.id)} onChange={e=>setMnids(p=>e.target.checked?[...p,n.id]:p.filter(id=>id!==n.id))}/>
-                {n.title}
-              </label>
+      {/* ── 生成済みデータの確認・編集 ── */}
+      {(quotes.length > 0 || characters.length > 0 || themes.length > 0) && (
+        <div>
+          <div style={{fontSize:9,letterSpacing:".28em",color:"var(--txt3)",textTransform:"uppercase",marginBottom:20}}>
+            生成済みデータの確認・個別編集
+          </div>
+          <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:24}}>
+            {[
+              {id:"quotes",label:`名言・名文 (${quotes.length})`},
+              {id:"chars",label:`キャラクター (${characters.length})`},
+              {id:"themes",label:`主題 (${themes.length})`},
+              {id:"motifs",label:`モチーフ (${motifs.length})`},
+              {id:"notes",label:"作者ノート"},
+            ].map(t=>(
+              <button key={t.id} style={tabStyle(t.id)} onClick={()=>setEditTab(t.id)}>{t.label}</button>
             ))}
           </div>
-        </div>
-        <button className="btn btn-primary" disabled={!mk.trim()} onClick={async()=>{
-          const newM={id:`m${Date.now()}`,keyword:mk.trim(),description:md.trim(),novelIds:mnids};
-          await flash(()=>setGallery(g=>({...g,motifs:[...(g.motifs||[]),newM]})));
-          setMk(""); setMd(""); setMnids([]);
-        }}>追加する</button>
-        {saved&&<span style={{marginLeft:12,fontSize:12,color:"var(--accent)"}}>✓ 追加しました</span>}
-      </div>
-      <div className="alist" style={{marginBottom:32}}>
-        {(gallery?.motifs||[]).length===0&&<div style={{padding:"16px",color:"var(--txt3)",fontSize:13}}>モチーフがまだ登録されていません</div>}
-        {(gallery?.motifs||[]).map((m,i)=>(
-          <div key={m.id} className="arow">
-            <div className="arow-info">
-              <div className="arow-title">{m.keyword}</div>
-              <div className="arow-meta">{(m.description||"").slice(0,50)}{m.description?.length>50?"…":""}</div>
-            </div>
-            <button className="icon-btn danger" onClick={()=>flash(()=>setGallery(g=>({...g,motifs:(g.motifs||[]).filter((_,j)=>j!==i)})))}>🗑</button>
-          </div>
-        ))}
-      </div>
 
-      {/* 作者ノート */}
-      <div className="form-group">
-        <label className="form-label">作者ノート（主題ページに表示）</label>
-        <textarea className="form-textarea" rows={6} value={gallery?.notes||""} onChange={e=>setGallery(g=>({...g,notes:e.target.value}))} placeholder="作品全体を通じた思いや、執筆意図など…"/>
-      </div>
-      <button className="btn btn-primary" onClick={()=>flash()}>保存する</button>
-      {saved&&<span style={{marginLeft:12,fontSize:12,color:"var(--accent)"}}>✓ 保存しました</span>}
-    </>
+          {/* 名言一覧 */}
+          {editTab==="quotes"&&(
+            <div>
+              {quotes.map((q,i)=>(
+                <div key={q.id} style={{borderBottom:"1px solid var(--border)",padding:"16px 0"}}>
+                  <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontFamily:"'Noto Serif JP',serif",fontStyle:"italic",fontSize:14,color:"var(--txt)",lineHeight:2,marginBottom:8}}>
+                        「{q.text}」
+                      </div>
+                      <div style={{fontSize:11,color:"var(--txt3)",marginBottom:4}}>
+                        『{q.novelTitle}』 {q.chapter&&`/ ${q.chapter}`}
+                      </div>
+                      {q.reason&&(
+                        <div style={{fontSize:11,color:"var(--txt3)",fontStyle:"italic",lineHeight:1.8}}>
+                          選出理由：{q.reason}
+                        </div>
+                      )}
+                    </div>
+                    <button className="icon-btn danger" style={{flexShrink:0}}
+                      onClick={()=>flash(()=>setGallery(g=>({...g,quotes:(g.quotes||[]).filter((_,j)=>j!==i)})))}>
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {quotes.length===0&&<div style={{color:"var(--txt3)",fontSize:13,padding:"24px 0"}}>AIを実行すると名言が生成されます</div>}
+            </div>
+          )}
+
+          {/* キャラクター一覧 */}
+          {editTab==="chars"&&(
+            <div>
+              {characters.map((c,i)=>(
+                <div key={c.id} style={{borderBottom:"1px solid var(--border)",padding:"16px 0"}}>
+                  <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                    <div style={{width:42,height:42,borderRadius:"50%",background:c.accent||"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"var(--serif)",fontSize:18,color:"#07070f",flexShrink:0}}>
+                      {(c.name||"？").charAt(0)}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:4,flexWrap:"wrap"}}>
+                        <span style={{fontFamily:"var(--serif)",fontSize:17,color:"var(--txt)"}}>{c.name}</span>
+                        <span style={{fontSize:10,letterSpacing:".2em",color:"var(--txt3)",textTransform:"uppercase"}}>{c.role}</span>
+                        <span style={{fontSize:10,color:"var(--accent)"}}>『{c.novelTitle}』</span>
+                      </div>
+                      <div style={{fontSize:13,color:"var(--txt2)",lineHeight:2,marginBottom:8,whiteSpace:"pre-line"}}>
+                        {c.description}
+                      </div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {(c.traits||[]).map(tr=>(
+                          <span key={tr} style={{fontSize:9,letterSpacing:".12em",border:"1px solid var(--border)",color:"var(--txt3)",padding:"2px 9px"}}>{tr}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <button className="icon-btn danger" style={{flexShrink:0}}
+                      onClick={()=>flash(()=>setGallery(g=>({...g,characters:(g.characters||[]).filter((_,j)=>j!==i)})))}>
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {characters.length===0&&<div style={{color:"var(--txt3)",fontSize:13,padding:"24px 0"}}>AIを実行するとキャラクター分析が生成されます</div>}
+            </div>
+          )}
+
+          {/* 主題一覧 */}
+          {editTab==="themes"&&(
+            <div>
+              {themes.map((th,i)=>(
+                <div key={th.id} style={{borderBottom:"1px solid var(--border)",padding:"16px 0"}}>
+                  <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:10,letterSpacing:".3em",color:"var(--accent)",marginBottom:6,textTransform:"uppercase"}}>
+                        『{th.novelTitle}』
+                      </div>
+                      <div style={{fontFamily:"var(--serif)",fontSize:17,color:"var(--txt)",marginBottom:8}}>
+                        {th.title}
+                      </div>
+                      <div style={{fontSize:13,color:"var(--txt2)",lineHeight:2}}>
+                        {th.description}
+                      </div>
+                    </div>
+                    <button className="icon-btn danger" style={{flexShrink:0}}
+                      onClick={()=>flash(()=>setGallery(g=>({...g,themes:(g.themes||[]).filter((_,j)=>j!==i)})))}>
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {themes.length===0&&<div style={{color:"var(--txt3)",fontSize:13,padding:"24px 0"}}>AIを実行すると主題分析が生成されます</div>}
+            </div>
+          )}
+
+          {/* モチーフ一覧 */}
+          {editTab==="motifs"&&(
+            <div>
+              {motifs.map((m,i)=>(
+                <div key={m.id} style={{borderBottom:"1px solid var(--border)",padding:"16px 0"}}>
+                  <div style={{display:"flex",gap:16,alignItems:"flex-start"}}>
+                    <div style={{fontFamily:"var(--serif)",fontSize:22,color:"var(--accent)",minWidth:100,flexShrink:0,paddingTop:2}}>
+                      {m.keyword}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,color:"var(--txt2)",lineHeight:2,marginBottom:8}}>
+                        {m.description}
+                      </div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {(m.novelIds||[]).map(nid=>{
+                          const nov=novels.find(n=>n.id===nid);
+                          return nov?<span key={nid} style={{fontSize:9,letterSpacing:".18em",border:"1px solid var(--border)",color:"var(--txt3)",padding:"2px 8px"}}>『{nov.title}』</span>:null;
+                        })}
+                      </div>
+                    </div>
+                    <button className="icon-btn danger" style={{flexShrink:0}}
+                      onClick={()=>flash(()=>setGallery(g=>({...g,motifs:(g.motifs||[]).filter((_,j)=>j!==i)})))}>
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {motifs.length===0&&<div style={{color:"var(--txt3)",fontSize:13,padding:"24px 0"}}>AIを実行するとモチーフ分析が生成されます</div>}
+            </div>
+          )}
+
+          {/* 作者ノート */}
+          {editTab==="notes"&&(
+            <div>
+              <div style={{fontSize:12,color:"var(--txt3)",lineHeight:1.9,marginBottom:16}}>
+                AIが生成した作品群への批評ノートです。編集して保存することもできます。
+              </div>
+              <textarea
+                className="form-textarea"
+                rows={10}
+                value={gallery?.notes||""}
+                onChange={e=>setGallery(g=>({...g,notes:e.target.value}))}
+                style={{fontFamily:"'Noto Serif JP',serif",fontSize:14,lineHeight:2}}
+                placeholder="AIを実行すると、作品群全体への批評ノートが生成されます"
+              />
+              <div style={{marginTop:16}}>
+                <button className="btn btn-primary" onClick={()=>flash()}>保存する</button>
+                {saved&&<span style={{marginLeft:12,fontSize:12,color:"var(--accent)"}}>✓ 保存しました</span>}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1255,10 +1447,18 @@ function GalleryPage({gallery, novels, site}){
               <div className="quote-stage" onClick={nextQuote}>
                 <div className="quote-stage-bg"/>
                 <div className={`quote-stage-content ${quoteAnim?"quote-animate":""}`} key={quoteIdx}>
-                  <div className="quote-text">{currentQuote.text}</div>
-                  <div className="quote-source">
-                    {currentQuote.novelTitle}<span>/</span>{currentQuote.chapter||""}
+                  <div style={{marginBottom:28}}>
+                    <span className="quote-before">「</span>
+                    <span className="quote-text">{currentQuote.text}</span>
+                    <span className="quote-after">」</span>
                   </div>
+                  <div className="quote-source">
+                    {currentQuote.novelTitle}
+                    {currentQuote.chapter&&<><span>/</span>{currentQuote.chapter}</>}
+                  </div>
+                  {currentQuote.reason&&(
+                    <div className="quote-reason">― {currentQuote.reason}</div>
+                  )}
                   <div className="quote-dots">
                     {shuffled.map((_,i)=>(
                       <div key={i} className={`quote-dot ${i===quoteIdx?"active":""}`}
@@ -1287,7 +1487,11 @@ function GalleryPage({gallery, novels, site}){
                 {quotes.map(q=>(
                   <div key={q.id} className="quote-card">
                     <div className="quote-card-text">「{q.text}」</div>
-                    <div className="quote-card-source"><b>{q.novelTitle}</b> ／ {q.chapter||""}</div>
+                    <div className="quote-card-source">
+                      <b>『{q.novelTitle}』</b>
+                      {q.chapter&&<span style={{marginLeft:6}}>{q.chapter}</span>}
+                    </div>
+                    {q.reason&&<div className="quote-card-reason">― {q.reason}</div>}
                   </div>
                 ))}
               </div>
@@ -1695,9 +1899,7 @@ function AdminPanel({store,onClose}){
     {id:"messages",label:"受信メッセージ",icon:"✉️",badge:unread},
     {id:"theme",label:"デザイン・テーマ",icon:"🎨"},
     {id:"novels",label:"作品管理",icon:"📚"},
-    {id:"gallery_quotes",label:"名言・名文",icon:"💬"},
-    {id:"gallery_chars",label:"キャラクター",icon:"👤"},
-    {id:"gallery_themes",label:"主題・モチーフ",icon:"🔍"},
+    {id:"gallery",label:"ギャラリー管理",icon:"✦"},
   ];
 
   return(
@@ -1981,31 +2183,18 @@ function AdminPanel({store,onClose}){
         })()}
       </div>
 
-        {/* ── ギャラリー管理：名言・名文 ── */}
-        {sec==="gallery_quotes"&&(
+        {/* ── ギャラリー管理（AI分析） ── */}
+        {sec==="gallery"&&(
           <div className="fadein">
-            <div className="admin-title">名言・名文の管理</div>
-            <p style={{color:"var(--txt3)",fontSize:12,marginBottom:24,lineHeight:1.9}}>
-              作品を精読した上で選出した名言・名文を登録してください。<br/>
-              ギャラリーではランダムに表示されます。
-            </p>
-            <GalleryQuoteForm novels={novels} gallery={gallery} setGallery={setGallery} flash={flash} saved={saved}/>
-          </div>
-        )}
-
-        {/* ── ギャラリー管理：キャラクター ── */}
-        {sec==="gallery_chars"&&(
-          <div className="fadein">
-            <div className="admin-title">キャラクター管理</div>
-            <GalleryCharForm novels={novels} gallery={gallery} setGallery={setGallery} flash={flash} saved={saved}/>
-          </div>
-        )}
-
-        {/* ── ギャラリー管理：主題・モチーフ ── */}
-        {sec==="gallery_themes"&&(
-          <div className="fadein">
-            <div className="admin-title">主題・モチーフ管理</div>
-            <GalleryThemeForm novels={novels} gallery={gallery} setGallery={setGallery} flash={flash} saved={saved}/>
+            <div className="admin-title">ギャラリー管理</div>
+            <GalleryAdminPanel
+              novels={novels}
+              gallery={gallery}
+              setGallery={setGallery}
+              flash={flash}
+              saved={saved}
+              saving={saving}
+            />
           </div>
         )}
 
