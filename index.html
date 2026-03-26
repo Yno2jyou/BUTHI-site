@@ -50,6 +50,41 @@ const DEFAULT_AUTHOR = {
   influences:"カフカ, ドストエフスキー, 安部公房, カミュ", since:"2020",
   icon:"", links:[], murmurs:[],
 };
+// ═══════════════ GALLERY DEFAULTS ═══════════════
+const DEFAULT_GALLERY = {
+  quotes: [
+    { id:"q1", text:"深夜三時。部屋の灯りを落としてから、もう何時間が経ったのだろうか。", novelId:"n1", novelTitle:"深夜の鏡", chapter:"第一章　鏡の前で" },
+    { id:"q2", text:"鏡の中の男が彼を見つめている。同じ顔、同じ目。しかしどこか——ほんのわずかに——違う気がした。", novelId:"n1", novelTitle:"深夜の鏡", chapter:"第一章　鏡の前で" },
+    { id:"q3", text:"デカルトは間違っていた。コギト・エルゴ・スム——あれは命題として成立していない。", novelId:"n2", novelTitle:"午前四時の哲学", chapter:"第一章　眠れない二人" },
+    { id:"q4", text:"声に出すつもりはなかった。だが言葉は勝手に唇から零れ落ちた。", novelId:"n1", novelTitle:"深夜の鏡", chapter:"第一章　鏡の前で" },
+    { id:"q5", text:"窓の外、東の空がほんのわずかに白みかけていた。眠れない夜の、終わりの始まり。", novelId:"n2", novelTitle:"午前四時の哲学", chapter:"第一章　眠れない二人" },
+  ],
+  characters: [
+    { id:"ch1", novelId:"n1", novelTitle:"深夜の鏡", name:"主人公（名無し）", role:"主人公", accent:"#8b5cf6",
+      description:"深夜三時に鏡と向き合う男。名前は与えられず、読者自身の投影として描かれる。アイデンティティの崩壊と再生を体験する存在。",
+      traits:["内省的","孤独","分裂した自己意識"] },
+    { id:"ch2", novelId:"n2", novelTitle:"午前四時の哲学", name:"アキラ", role:"主人公", accent:"#f59e0b",
+      description:"デカルトを批判することから議論を始める哲学青年。眠れない夜に自らの存在証明を求める。論理的だが、その底に深い不安を抱える。",
+      traits:["論理的","懐疑的","孤独な思索者"] },
+    { id:"ch3", novelId:"n2", novelTitle:"午前四時の哲学", name:"ケンジ", role:"相棒", accent:"#f59e0b",
+      description:"アキラの問いに応答する対話の相手。受け手として機能しながらも、独自の哲学観を持つ。二人の対話が物語の核心を形成する。",
+      traits:["傾聴者","実存的","静かな知性"] },
+  ],
+  themes: [
+    { id:"t1", novelId:"n1", novelTitle:"深夜の鏡", title:"自己同一性の崩壊", description:"鏡という装置を通じて、「自分が自分である」という確信の脆さを問う。" },
+    { id:"t2", novelId:"n1", novelTitle:"深夜の鏡", title:"深夜という時空間", description:"深夜三時は日常と異常の境界線。理性が弛緩し、存在の底が露わになる時刻として機能する。" },
+    { id:"t3", novelId:"n2", novelTitle:"午前四時の哲学", title:"言語と存在の関係", description:"コギトへの批判を通じ、言葉で存在を証明することの不可能性と必然性を探る。" },
+    { id:"t4", novelId:"n2", novelTitle:"午前四時の哲学", title:"対話としての思考", description:"一人では辿り着けない真実に、二人の対話が少しずつ近づいていく構造を持つ。" },
+  ],
+  motifs: [
+    { id:"m1", keyword:"鏡", description:"自己の他者化。主体と客体の反転装置。淵作品に繰り返し現れる中心モチーフ。", novelIds:["n1"] },
+    { id:"m2", keyword:"深夜・夜明け前", description:"「深夜三時」「午前四時」——日常が溶ける時刻。意識の底が露わになる時間帯。", novelIds:["n1","n2"] },
+    { id:"m3", keyword:"名前のない主人公", description:"固有名を持たない「彼」は読者の自己投影を促す。個から普遍へ。", novelIds:["n1"] },
+    { id:"m4", keyword:"対話と独白", description:"二人の会話が実は一人の内的対話である可能性を示唆する構造的モチーフ。", novelIds:["n2"] },
+  ],
+  notes: "",
+};
+
 const DEFAULT_NOVELS = [
   { id:"n1", title:"深夜の鏡", subtitle:"闇の中の自己探求", author:"蒼井 玲", genre:"心理・文学",
     tags:["心理","アイデンティティ","孤独"],
@@ -71,42 +106,32 @@ const ADMIN_PASSWORD = "abbcccddddeeeee";
 
 // ═══════════════ FIREBASE HELPERS ═══════════════
 // ファイル（画像など）をFirebase Storageにアップロードし、URLを返す
+async function uploadFile(file, path) {
+  const ref = storage.ref(path);
+  await ref.putString(file.data, "data_url");
+  return await ref.getDownloadURL();
+}
+
 // base64データURIかどうかを判定
 const isDataUri = s => typeof s === "string" && s.startsWith("data:");
 
-// 画像をCanvas経由でリサイズ・圧縮してbase64を返す（Firestore直接保存用）
-async function compressImage(dataUri, maxPx=800, quality=0.72) {
-  return new Promise((resolve)=>{
-    const img = new Image();
-    img.onload = ()=>{
-      const scale = Math.min(1, maxPx/Math.max(img.width,img.height));
-      const w = Math.round(img.width*scale);
-      const h = Math.round(img.height*scale);
-      const canvas = document.createElement("canvas");
-      canvas.width=w; canvas.height=h;
-      canvas.getContext("2d").drawImage(img,0,0,w,h);
-      resolve(canvas.toDataURL("image/jpeg", quality));
-    };
-    img.onerror = ()=>resolve(dataUri);
-    img.src = dataUri;
-  });
-}
-
-// ひとりごとのファイルを圧縮してbase64のまま返す（Storage不使用）
+// ひとりごとのファイル添付をStorageへアップロードし、URLに変換する
 async function uploadMurmurFiles(murmurId, files) {
-  return await Promise.all((files||[]).map(async (f) => {
-    if (f.type==="image" && isDataUri(f.data)) {
-      const compressed = await compressImage(f.data);
-      return { ...f, data: compressed };
-    }
-    return f;
+  return await Promise.all((files||[]).map(async (f, i) => {
+    if (!isDataUri(f.data)) return f; // すでにURL済みはスキップ
+    const ext = f.name.split(".").pop();
+    const path = `murmurs/${murmurId}/file_${i}.${ext}`;
+    const url = await uploadFile(f, path);
+    return { ...f, data: url };
   }));
 }
 
-// 著者アイコンを圧縮してbase64のまま返す（Storage不使用）
+// 著者アイコンをStorageへアップロード
 async function uploadAuthorIcon(dataUri) {
   if (!isDataUri(dataUri)) return dataUri;
-  return await compressImage(dataUri, 400, 0.80);
+  const ref = storage.ref("author/icon.jpg");
+  await ref.putString(dataUri, "data_url");
+  return await ref.getDownloadURL();
 }
 
 // ═══════════════ FIRESTORE STORE ═══════════════
@@ -115,6 +140,7 @@ function useStore() {
   const [author,  setAuthorLocal] = useState(DEFAULT_AUTHOR);
   const [novels,  setNovelsLocal] = useState([]);
   const [messages,setMsgLocal]    = useState([]);
+  const [gallery, setGalleryLocal]= useState(DEFAULT_GALLERY);
   const [loading, setLoading]     = useState(true);
   const [dbError, setDbError]     = useState(null);
 
@@ -122,7 +148,7 @@ function useStore() {
   useEffect(() => {
     const unsubs = [];
     let resolved = 0;
-    const check = () => { resolved++; if(resolved >= 4) setLoading(false); };
+    const check = () => { resolved++; if(resolved >= 5) setLoading(false); };
 
     // settings/site
     unsubs.push(db.collection("settings").doc("site").onSnapshot(snap => {
@@ -133,6 +159,12 @@ function useStore() {
     // settings/author
     unsubs.push(db.collection("settings").doc("author").onSnapshot(snap => {
       if (snap.exists) setAuthorLocal(snap.data()); else setAuthorLocal(DEFAULT_AUTHOR);
+      check();
+    }, e => { setDbError(e.message); check(); }));
+
+    // settings/gallery
+    unsubs.push(db.collection("settings").doc("gallery").onSnapshot(snap => {
+      if (snap.exists) setGalleryLocal(snap.data()); else setGalleryLocal(DEFAULT_GALLERY);
       check();
     }, e => { setDbError(e.message); check(); }));
 
@@ -184,7 +216,7 @@ function useStore() {
       title:"新しい作品", subtitle:"", author:author.name, genre:"小説",
       tags:[], description:"", color1:"#0a0a14", color2:"#1a1a2e", accent:"#c8a86a",
       wordCount:"", updated: new Date().toISOString().slice(0,7),
-      chapters:[], createdAt: now, pinned:false, locked:false,
+      chapters:[], createdAt: now,
     };
     const ref = await db.collection("novels").add(data);
     return ref.id;
@@ -242,8 +274,7 @@ function useStore() {
     const now = new Date();
     // ファイルをStorageへアップロード
     let uploadedFiles = [];
-    try { uploadedFiles = await uploadMurmurFiles(mid, files||[]); }
-    catch(e) { console.error(e); uploadedFiles = files||[]; }
+    try { uploadedFiles = await uploadMurmurFiles(mid, files||[]); } catch(e) { console.error(e); }
     const m = { id: mid, text, files: uploadedFiles, date: now.toLocaleString("ja-JP"), isoDate: now.toISOString() };
     const nextMurmurs = [m, ...(author.murmurs||[])];
     setAuthorLocal(a => ({...a, murmurs: nextMurmurs}));
@@ -254,16 +285,18 @@ function useStore() {
     setAuthorLocal(a => ({...a, murmurs: nextMurmurs}));
     try { await db.collection("settings").doc("author").update({ murmurs: nextMurmurs }); } catch(e) { console.error(e); }
   };
-  const updateMurmur = async (id, text) => {
-    const nextMurmurs = (author.murmurs||[]).map(m => m.id===id ? {...m, text} : m);
-    setAuthorLocal(a => ({...a, murmurs: nextMurmurs}));
-    try { await db.collection("settings").doc("author").update({ murmurs: nextMurmurs }); } catch(e) { console.error(e); }
-  };
 
-  return { site, setSite, author, setAuthor, novels, messages, loading, dbError,
+  // ── ギャラリー ──
+  const setGallery = useCallback(async v => {
+    const next = typeof v === "function" ? v(gallery) : v;
+    setGalleryLocal(next);
+    try { await db.collection("settings").doc("gallery").set(next); } catch(e) { console.error(e); }
+  }, [gallery]);
+
+  return { site, setSite, author, setAuthor, novels, messages, gallery, setGallery, loading, dbError,
     addMessage, deleteMessage, markRead,
     addNovel, updateNovel, deleteNovel, addChapter, updateChapter, deleteChapter,
-    addMurmur, deleteMurmur, updateMurmur };
+    addMurmur, deleteMurmur };
 }
 
 // ═══════════════ HELPERS ═══════════════
@@ -275,11 +308,7 @@ function groupByYM(items, getISO) {
     if(!map.has(ym)) map.set(ym,[]);
     map.get(ym).push(item);
   });
-  return [...map.entries()].sort(([a],[b])=>{
-    if(a==="不明") return 1; if(b==="不明") return -1;
-    const parse=s=>{ const m=s.match(/(\d+)年(\d+)月/); return m?new Date(+m[1],+m[2]-1):new Date(0); };
-    return parse(a)-parse(b);
-  });
+  return [...map.entries()];
 }
 
 const THEMES=[
@@ -304,26 +333,17 @@ function fmtDate(iso){
 }
 
 // ═══════════════ STYLES ═══════════════
-function Styles({site, lightMode}){
+function Styles({site}){
   const accent=site.theme?.accent||"#c8a86a";
-  const bg=lightMode?"#f5f0e8":(site.theme?.bg||"#07070f");
+  const bg=site.theme?.bg||"#07070f";
   const font=site.theme?.font==="gothic"?"'Noto Sans JP',sans-serif":"'Cormorant Garamond','Noto Serif JP',serif";
-  // ライトモード時はテキスト色を反転
-  const txt   = lightMode?"#1a1814":"#e2ddd4";
-  const txt2  = lightMode?"#5c5650":"#8c8578";
-  const txt3  = lightMode?"#9c9890":"#4a4840";
-  const border= lightMode?"rgba(0,0,0,.1)":"rgba(255,255,255,.06)";
-  const borderHi=lightMode?"rgba(0,0,0,.18)":"rgba(255,255,255,.14)";
-  const navBg = lightMode?"rgba(245,240,232,.92)":"rgba(7,7,15,.9)";
-  const mix=lightMode?"aaa":"888";
   return React.createElement('style',null,`
-    :root{--bg:${bg};--deep:color-mix(in srgb,${bg} 88%,#${mix} 12%);--surface:color-mix(in srgb,${bg} 80%,#${mix} 20%);--raised:color-mix(in srgb,${bg} 72%,#${mix} 28%);--txt:${txt};--txt2:${txt2};--txt3:${txt3};--border:${border};--border-hi:${borderHi};--accent:${accent};--accent-glow:${accent}2a;--accent-dim:${accent}14;--serif:${font};--body:'Noto Serif JP',serif;--nav-bg:${navBg}}
+    :root{--bg:${bg};--deep:color-mix(in srgb,${bg} 85%,#fff 15%);--surface:color-mix(in srgb,${bg} 75%,#fff 25%);--raised:color-mix(in srgb,${bg} 65%,#fff 35%);--txt:#e2ddd4;--txt2:#8c8578;--txt3:#4a4840;--border:rgba(255,255,255,.06);--border-hi:rgba(255,255,255,.14);--accent:${accent};--accent-glow:${accent}2a;--accent-dim:${accent}14;--serif:${font};--body:'Noto Serif JP',serif}
     html{scroll-behavior:smooth}body{background:var(--bg);overflow-x:hidden}
     .app{min-height:100vh;background:var(--bg);color:var(--txt);font-family:var(--body)}
-    .nav{position:relative;z-index:10}.hero{position:relative;z-index:10}.section{position:relative;z-index:10}.detail-body{position:relative;z-index:10}.reading-wrap{position:relative;z-index:10}
     .app::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.03'/%3E%3C/svg%3E");pointer-events:none;z-index:9999}
     /* NAV */
-    .nav{position:fixed;top:0;left:0;right:0;z-index:500;height:60px;padding:0 40px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:var(--nav-bg);backdrop-filter:blur(20px)}
+    .nav{position:fixed;top:0;left:0;right:0;z-index:500;height:60px;padding:0 40px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:rgba(7,7,15,.9);backdrop-filter:blur(20px)}
     .nav-logo{cursor:pointer}.nav-logo-main{font-family:var(--serif);font-size:20px;font-weight:300;color:var(--accent);letter-spacing:.12em}.nav-logo-sub{font-size:8px;letter-spacing:.4em;color:var(--txt3);text-transform:uppercase;margin-top:1px}
     .nav-center{display:flex;gap:4px}
     .nav-btn{background:none;border:none;cursor:pointer;font-family:var(--body);font-size:10px;letter-spacing:.26em;text-transform:uppercase;color:var(--txt3);padding:6px 12px;border-radius:2px;transition:color .25s,background .25s}
@@ -384,18 +404,16 @@ function Styles({site, lightMode}){
     .toc-text{font-size:14px;color:var(--txt);transition:color .2s;letter-spacing:.04em}
     .toc-arrow{margin-left:auto;font-size:15px;color:var(--txt3);transition:transform .2s,color .2s}.toc-item:hover .toc-arrow{transform:translateX(5px);color:var(--accent)}
     /* READING */
-    .reading-nav{position:fixed;top:0;left:0;right:0;z-index:500;height:54px;padding:0 36px;display:flex;align-items:center;gap:14px;background:var(--nav-bg);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+    .reading-nav{position:fixed;top:0;left:0;right:0;z-index:500;height:54px;padding:0 36px;display:flex;align-items:center;gap:14px;background:rgba(7,7,15,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
     .reading-back{background:none;border:none;cursor:pointer;color:var(--txt3);font-size:15px;padding:4px;transition:color .2s}.reading-back:hover{color:var(--accent)}
     .reading-crumb{font-size:11px;color:var(--txt3);letter-spacing:.1em}.reading-crumb b{color:var(--txt2);font-weight:400}
     .progress-rail{position:fixed;top:54px;left:0;right:0;height:2px;background:var(--border);z-index:500}.progress-fill{height:100%;background:var(--accent);transition:width .1s}
-    /* ── カクヨム風 本文エリア ── */
-    .reading-wrap{background:var(--bg);min-height:100vh}
-    .reading-content{max-width:820px;margin:0 auto;padding:88px 40px 60px}
-    .reading-eyebrow{font-size:9px;letter-spacing:.44em;color:var(--accent);text-transform:uppercase;margin-bottom:20px;text-align:center}
-    .reading-ch-title{font-family:'Noto Serif JP',serif;font-size:clamp(18px,3.5vw,24px);font-weight:500;color:var(--txt);line-height:1.9;margin-bottom:56px;padding-bottom:28px;border-bottom:1px solid var(--border);text-align:center;letter-spacing:.2em}
-    .reading-body{font-family:'Noto Serif JP',serif;font-size:16px;line-height:2.3;color:var(--txt);letter-spacing:.06em}
-    .reading-body p{margin-bottom:0;text-indent:1em}
-    .reading-foot{display:flex;justify-content:space-between;align-items:center;max-width:820px;margin:0 auto;padding:48px 40px 90px;border-top:1px solid var(--border)}
+    .reading-content{max-width:640px;margin:0 auto;padding:96px 36px 56px}
+    .reading-eyebrow{font-size:9px;letter-spacing:.44em;color:var(--accent);text-transform:uppercase;margin-bottom:26px}
+    .reading-ch-title{font-family:var(--serif);font-size:clamp(26px,5vw,44px);font-weight:300;color:var(--txt);line-height:1.15;margin-bottom:48px;padding-bottom:36px;border-bottom:1px solid var(--border)}
+    .reading-body{font-family:'Libre Baskerville',var(--body);font-size:17px;line-height:3;color:var(--txt2);letter-spacing:.05em}
+    .reading-body p{margin-bottom:0;text-indent:1.5em}.reading-body p:first-child{text-indent:0}
+    .reading-foot{display:flex;justify-content:space-between;align-items:center;max-width:640px;margin:0 auto;padding:56px 36px 90px;border-top:1px solid var(--border)}
     .reading-foot-btn{background:none;border:1px solid var(--border);color:var(--txt2);font-family:var(--body);font-size:11px;letter-spacing:.18em;padding:10px 20px;cursor:pointer;transition:all .2s;text-transform:uppercase}
     .reading-foot-btn:hover{border-color:var(--accent);color:var(--accent)}.reading-foot-btn:disabled{opacity:.22;cursor:not-allowed}
     .reading-foot-pos{font-family:var(--serif);font-size:14px;color:var(--txt3)}
@@ -432,7 +450,7 @@ function Styles({site, lightMode}){
     .profile-links{display:flex;gap:10px;flex-wrap:wrap}
     .profile-link-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);padding:7px 16px;font-size:12px;color:var(--txt2);letter-spacing:.06em;text-decoration:none;transition:all .2s;border-radius:2px;background:none}.profile-link-btn:hover{border-color:var(--accent);color:var(--accent)}
     /* MSG FORM */
-    .msg-form{background:color-mix(in srgb,var(--bg) 92%,#888 8%);border:1px solid var(--border-hi);padding:28px 28px 24px}
+    .msg-form{background:var(--surface);border:1px solid var(--border);padding:28px 28px 24px}
     .msg-form-title{font-family:var(--serif);font-size:18px;font-weight:300;color:var(--txt);letter-spacing:.08em;margin-bottom:20px}
     .msg-sent{text-align:center;padding:32px 0;color:var(--txt2);font-size:14px;letter-spacing:.08em}
     .msg-sent-icon{font-size:32px;display:block;margin-bottom:12px}
@@ -442,108 +460,150 @@ function Styles({site, lightMode}){
     .footer-copy{font-size:10px;color:var(--txt3);letter-spacing:.18em}
     /* ADMIN */
     .admin-overlay{position:fixed;inset:0;z-index:800;display:flex}
-    .admin-sidebar{width:260px;background:color-mix(in srgb,var(--bg) 93%,#fff 7%);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+    .admin-sidebar{width:260px;background:var(--deep);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
     .admin-logo{padding:24px 24px 20px;border-bottom:1px solid var(--border)}.admin-logo-txt{font-family:var(--serif);font-size:16px;color:var(--accent);letter-spacing:.1em}.admin-logo-sub{font-size:8px;letter-spacing:.35em;color:var(--txt3);text-transform:uppercase;margin-top:2px}
     .admin-nav{padding:16px 12px;flex:1}.admin-nav-group{margin-bottom:24px}
-    .admin-nav-label{font-size:8px;letter-spacing:.36em;color:var(--txt2);text-transform:uppercase;padding:0 12px;margin-bottom:8px;display:block}
+    .admin-nav-label{font-size:8px;letter-spacing:.36em;color:var(--txt3);text-transform:uppercase;padding:0 12px;margin-bottom:8px;display:block}
     .admin-nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:3px;cursor:pointer;font-size:13px;color:var(--txt2);letter-spacing:.04em;transition:all .2s;background:none;border:none;font-family:var(--body);width:100%;text-align:left}
     .admin-nav-item:hover{background:var(--surface);color:var(--txt)}.admin-nav-item.active{background:var(--accent-dim);color:var(--accent)}
     .admin-close{margin:12px}.admin-close-btn{width:100%;background:none;border:1px solid var(--border);color:var(--txt3);font-family:var(--body);font-size:10px;letter-spacing:.22em;text-transform:uppercase;padding:10px;cursor:pointer;transition:all .2s;border-radius:2px}.admin-close-btn:hover{border-color:var(--border-hi);color:var(--txt2)}
     .admin-main{flex:1;background:var(--bg);overflow-y:auto;padding:40px 48px 120px}
     .admin-title{font-family:var(--serif);font-size:28px;font-weight:300;color:var(--txt);margin-bottom:36px;letter-spacing:.06em}
-    .form-group{margin-bottom:24px}.form-label{display:block;font-size:9px;letter-spacing:.36em;text-transform:uppercase;color:var(--txt2);margin-bottom:8px}
-    .form-input,.form-textarea{width:100%;background:color-mix(in srgb,var(--bg) 97%,#888 3%);border:1px solid var(--border-hi);color:var(--txt);font-family:var(--body);font-size:14px;padding:11px 14px;outline:none;border-radius:2px;transition:border-color .2s,box-shadow .2s;letter-spacing:.04em}
-    .form-input:focus,.form-textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}.form-textarea{resize:vertical;min-height:100px;line-height:1.8}
-    .form-input::placeholder,.form-textarea::placeholder{color:var(--txt3)}
-    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}.form-hint{font-size:11px;color:var(--txt2);margin-top:6px;letter-spacing:.04em}
-    .color-row{display:flex;align-items:center;gap:12px}.color-swatch{width:36px;height:36px;border-radius:3px;border:1px solid rgba(255,255,255,.2);cursor:pointer;flex-shrink:0;transition:transform .15s}.color-swatch:hover{transform:scale(1.08)}.color-input-hidden{width:0;height:0;opacity:0;position:absolute}
-    /* カバープレビュー */
-    .gradient-preview{height:140px;border-radius:6px;border:1px solid rgba(255,255,255,.12);margin-bottom:20px;position:relative;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.4)}
-    .gp-dot{position:absolute;top:14px;right:14px;width:10px;height:10px;border-radius:50%;box-shadow:0 0 10px currentColor}
-    .gp-title{position:absolute;bottom:16px;left:20px;font-family:var(--serif);font-size:20px;font-weight:300;color:#e8e4de;letter-spacing:.06em;text-shadow:0 1px 6px rgba(0,0,0,.7);line-height:1.2}
-    .gp-subtitle{position:absolute;bottom:16px;left:20px;font-family:var(--serif);font-size:20px;font-weight:300;color:#e8e4de;letter-spacing:.06em;text-shadow:0 1px 6px rgba(0,0,0,.7);line-height:1.2}
+    .form-group{margin-bottom:24px}.form-label{display:block;font-size:9px;letter-spacing:.36em;text-transform:uppercase;color:var(--txt3);margin-bottom:8px}
+    .form-input,.form-textarea{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--txt);font-family:var(--body);font-size:14px;padding:11px 14px;outline:none;border-radius:2px;transition:border-color .2s;letter-spacing:.04em}
+    .form-input:focus,.form-textarea:focus{border-color:var(--border-hi)}.form-textarea{resize:vertical;min-height:100px;line-height:1.8}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}.form-hint{font-size:11px;color:var(--txt3);margin-top:6px;letter-spacing:.04em}
+    .color-row{display:flex;align-items:center;gap:12px}.color-swatch{width:36px;height:36px;border-radius:3px;border:1px solid var(--border);cursor:pointer;flex-shrink:0;transition:transform .15s}.color-swatch:hover{transform:scale(1.08)}.color-input-hidden{width:0;height:0;opacity:0;position:absolute}
+    .gradient-preview{height:80px;border-radius:3px;border:1px solid var(--border);margin-bottom:16px}
     .alist{display:flex;flex-direction:column;gap:1px;background:var(--border);margin-bottom:24px}
-    .arow{background:var(--bg);display:flex;flex-direction:column;gap:10px;padding:14px 18px;transition:background .2s}.arow:hover{background:var(--deep)}
-    .arow-top{display:flex;align-items:center;gap:10px;width:100%}
+    .arow{background:var(--bg);display:flex;align-items:center;gap:16px;padding:16px 18px;transition:background .2s}.arow:hover{background:var(--deep)}
     .arow-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-    .arow-info{flex:1;min-width:0}.arow-title{font-size:14px;color:var(--txt);letter-spacing:.04em;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.arow-meta{font-size:11px;color:var(--txt3);line-height:1.6}
-    .arow-actions{display:flex;gap:6px;flex-shrink:0;padding-left:18px}
+    .arow-info{flex:1;min-width:0}.arow-title{font-size:15px;color:var(--txt);letter-spacing:.04em;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.arow-meta{font-size:11px;color:var(--txt3)}
+    .arow-actions{display:flex;gap:8px;flex-shrink:0}
     .icon-btn{background:none;border:1px solid var(--border);color:var(--txt3);padding:6px 10px;cursor:pointer;font-size:13px;border-radius:2px;transition:all .2s}.icon-btn:hover{border-color:var(--border-hi);color:var(--txt2)}.icon-btn.danger:hover{border-color:#ef4444;color:#ef4444}.icon-btn.primary{border-color:var(--accent);color:var(--accent)}.icon-btn.primary:hover{background:var(--accent-dim)}
     .ch-list{display:flex;flex-direction:column;gap:1px;background:var(--border);margin-bottom:16px}.ch-row{background:var(--bg);display:flex;align-items:center;gap:12px;padding:14px 16px}.ch-row:hover{background:var(--deep)}.ch-num{font-family:var(--serif);font-size:11px;color:var(--txt3);width:28px;flex-shrink:0}.ch-txt{flex:1;font-size:13px;color:var(--txt2)}
     .save-bar{position:fixed;bottom:0;left:260px;right:0;z-index:900;padding:14px 48px;background:var(--deep);border-top:1px solid var(--border);display:flex;align-items:center}
     .save-status{font-size:11px;color:var(--txt3);letter-spacing:.14em}
     .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:950;display:flex;align-items:center;justify-content:center;padding:24px}
-    .modal{background:color-mix(in srgb,var(--bg) 92%,#fff 8%);border:1px solid rgba(255,255,255,.08);width:100%;max-width:480px;max-height:90vh;overflow-y:auto;padding:36px;border-radius:3px}
+    .modal{background:var(--deep);border:1px solid var(--border);width:100%;max-width:480px;max-height:90vh;overflow-y:auto;padding:36px;border-radius:3px}
     .modal-title{font-family:var(--serif);font-size:22px;font-weight:300;color:var(--txt);margin-bottom:28px;letter-spacing:.06em}
     .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:28px}
     .btn{background:none;border:1px solid var(--border);color:var(--txt2);font-family:var(--body);font-size:11px;letter-spacing:.2em;text-transform:uppercase;padding:10px 22px;cursor:pointer;border-radius:2px;transition:all .2s}
     .btn:hover{border-color:var(--border-hi);color:var(--txt)}.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:500}.btn-primary:hover{opacity:.88}.btn-danger{border-color:#ef4444;color:#ef4444}.btn-danger:hover{background:rgba(239,68,68,.1)}
-    .theme-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}.theme-swatch{border:2px solid transparent;border-radius:4px;overflow:hidden;cursor:pointer;transition:border-color .2s}.theme-swatch.sel{border-color:var(--accent)}.theme-swatch-preview{height:52px}.theme-swatch-label{font-size:9px;letter-spacing:.2em;color:var(--txt3);text-transform:uppercase;padding:5px 6px;text-align:center;background:color-mix(in srgb,var(--bg) 90%,#888 10%)}
+    .theme-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}.theme-swatch{border:2px solid transparent;border-radius:4px;overflow:hidden;cursor:pointer;transition:border-color .2s}.theme-swatch.sel{border-color:var(--accent)}.theme-swatch-preview{height:52px}.theme-swatch-label{font-size:9px;letter-spacing:.2em;color:var(--txt3);text-transform:uppercase;padding:5px 6px;text-align:center;background:var(--surface)}
     .font-grid{display:flex;gap:10px;margin-bottom:8px}.font-btn{flex:1;padding:12px;border:1px solid var(--border);background:none;cursor:pointer;border-radius:2px;transition:all .2s;text-align:center}.font-btn.sel{border-color:var(--accent);background:var(--accent-dim)}.font-btn-name{font-size:18px;color:var(--txt);margin-bottom:4px}.font-btn-label{font-size:9px;letter-spacing:.22em;color:var(--txt3);text-transform:uppercase}
     .msg-list{display:flex;flex-direction:column;gap:1px;background:var(--border);margin-bottom:16px}
     .msg-row{background:var(--bg);padding:16px 18px;transition:background .2s;cursor:pointer}.msg-row:hover{background:var(--deep)}.msg-row.unread{border-left:2px solid var(--accent)}
     .msg-hdr{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
     .msg-name{font-size:13px;color:var(--txt);font-weight:500}.msg-target{font-size:10px;letter-spacing:.18em;color:var(--accent);text-transform:uppercase;border:1px solid var(--accent-glow);padding:2px 8px;border-radius:1px}.msg-date{font-size:10px;color:var(--txt3);margin-left:auto}.msg-body{font-size:13px;line-height:1.9;color:var(--txt2);white-space:pre-wrap}.msg-acts{display:flex;gap:6px;margin-top:10px}
     .badge{background:var(--accent);color:var(--bg);font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;margin-left:6px}
-    /* ピン・ロック */
-    .novel-badge-pin{font-size:10px;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);padding:1px 7px;border-radius:2px;letter-spacing:.08em;flex-shrink:0}
-    .novel-badge-lock{font-size:10px;background:rgba(239,68,68,.12);border:1px solid #ef4444;color:#ef4444;padding:1px 7px;border-radius:2px;letter-spacing:.08em;flex-shrink:0}
-    .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
-    .toggle-label{font-size:13px;color:var(--txt);letter-spacing:.04em}
-    .toggle-desc{font-size:11px;color:var(--txt2);margin-top:2px}
-    .toggle-switch{position:relative;width:42px;height:24px;flex-shrink:0}
-    .toggle-switch input{opacity:0;width:0;height:0}
-    .toggle-slider{position:absolute;inset:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:background .2s,border-color .2s}
-    .toggle-slider::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:var(--txt3);border-radius:50%;transition:transform .2s,background .2s}
-    .toggle-switch input:checked+.toggle-slider{background:var(--accent-dim);border-color:var(--accent)}
-    .toggle-switch input:checked+.toggle-slider::before{transform:translateX(18px);background:var(--accent)}
-    /* 文字数統計 */
-    .wc-stat{font-family:var(--serif);font-size:11px;color:var(--txt3);letter-spacing:.1em;margin-left:4px}
-    .wc-stat b{color:var(--accent);font-weight:400}
-    .mobile-back-btn{display:none}
+    /* GALLERY */
+    .gallery-wrap{max-width:1120px;margin:0 auto;padding:110px 48px 100px}
+    .gallery-hero{margin-bottom:80px}
+    .gallery-hero-eyebrow{font-size:9px;letter-spacing:.44em;color:var(--txt3);text-transform:uppercase;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+    .gallery-hero-eyebrow::before{content:'';display:inline-block;width:22px;height:1px;background:var(--accent)}
+    .gallery-hero-title{font-family:var(--serif);font-size:clamp(46px,8vw,90px);font-weight:300;color:var(--txt);line-height:.94;letter-spacing:-.02em;margin-bottom:20px}
+    .gallery-hero-title em{font-style:italic;color:var(--accent)}
+    .gallery-hero-desc{font-size:13px;color:var(--txt3);letter-spacing:.12em;line-height:2;max-width:500px}
+    /* GALLERY TABS */
+    .gallery-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:64px;flex-wrap:wrap}
+    .gallery-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--txt3);font-family:var(--body);font-size:10px;letter-spacing:.26em;text-transform:uppercase;padding:12px 20px;cursor:pointer;transition:all .25s;margin-bottom:-1px}
+    .gallery-tab:hover{color:var(--txt2)}.gallery-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+    /* QUOTE STAGE */
+    .quote-stage{min-height:420px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;border:1px solid var(--border);margin-bottom:64px;overflow:hidden;cursor:pointer}
+    .quote-stage-bg{position:absolute;inset:0;opacity:.04;background:radial-gradient(ellipse at center,var(--accent),transparent 70%)}
+    .quote-stage-content{position:relative;padding:60px 80px;text-align:center;max-width:700px}
+    .quote-text{font-family:var(--serif);font-size:clamp(20px,3.5vw,32px);font-weight:300;color:var(--txt);line-height:1.8;letter-spacing:.06em;margin-bottom:32px;font-style:italic}
+    .quote-text::before{content:'「';color:var(--accent);opacity:.5;font-size:1.4em;line-height:0;vertical-align:-.2em}
+    .quote-text::after{content:'」';color:var(--accent);opacity:.5;font-size:1.4em;line-height:0;vertical-align:-.2em}
+    .quote-source{font-size:11px;letter-spacing:.28em;color:var(--txt3);text-transform:uppercase}
+    .quote-source span{color:var(--accent);margin:0 8px}
+    .quote-hint{position:absolute;bottom:20px;right:24px;font-size:9px;color:var(--txt3);letter-spacing:.2em}
+    .quote-dots{display:flex;gap:6px;margin-top:28px;justify-content:center}
+    .quote-dot{width:5px;height:5px;border-radius:50%;background:var(--border);transition:background .3s;cursor:pointer}.quote-dot.active{background:var(--accent)}
+    /* QUOTE GRID */
+    .quote-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1px;background:var(--border);margin-bottom:48px}
+    .quote-card{background:var(--bg);padding:28px 30px;transition:background .3s}.quote-card:hover{background:var(--deep)}
+    .quote-card-text{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--txt);line-height:2;margin-bottom:16px}
+    .quote-card-source{font-size:10px;color:var(--txt3);letter-spacing:.2em;padding-top:14px;border-top:1px solid var(--border)}
+    .quote-card-source b{color:var(--accent);font-weight:400}
+    /* CHARACTER */
+    .char-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1px;background:var(--border)}
+    .char-card{background:var(--bg);padding:30px 28px;transition:background .3s}.char-card:hover{background:var(--deep)}
+    .char-card-top{display:flex;align-items:flex-start;gap:16px;margin-bottom:18px}
+    .char-avatar{width:52px;height:52px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:20px;font-weight:300;color:var(--bg)}
+    .char-name{font-family:var(--serif);font-size:20px;font-weight:300;color:var(--txt);margin-bottom:3px}
+    .char-role{font-size:9px;letter-spacing:.3em;color:var(--txt3);text-transform:uppercase}
+    .char-novel{font-size:9px;letter-spacing:.2em;color:var(--accent);margin-top:3px}
+    .char-desc{font-size:13px;color:var(--txt2);line-height:2;margin-bottom:16px}
+    .char-traits{display:flex;gap:6px;flex-wrap:wrap}
+    .char-trait{font-size:9px;letter-spacing:.14em;border:1px solid var(--border);color:var(--txt3);padding:3px 9px}
+    /* THEME / MOTIF SECTION */
+    .theme-grid-gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1px;background:var(--border);margin-bottom:48px}
+    .theme-card{background:var(--bg);padding:28px 28px;transition:background .3s}.theme-card:hover{background:var(--deep)}
+    .theme-card-novel{font-size:9px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase;margin-bottom:10px}
+    .theme-card-title{font-family:var(--serif);font-size:19px;font-weight:300;color:var(--txt);margin-bottom:12px;line-height:1.3}
+    .theme-card-desc{font-size:13px;color:var(--txt2);line-height:2}
+    .motif-list{display:flex;flex-direction:column;gap:1px;background:var(--border)}
+    .motif-row{background:var(--bg);padding:22px 28px;display:grid;grid-template-columns:160px 1fr;gap:24px;align-items:start;transition:background .3s}.motif-row:hover{background:var(--deep)}
+    .motif-keyword{font-family:var(--serif);font-size:22px;font-weight:300;color:var(--accent);letter-spacing:.04em}
+    .motif-works{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+    .motif-work{font-size:8px;letter-spacing:.2em;color:var(--txt3);border:1px solid var(--border);padding:2px 7px}
+    .motif-desc{font-size:13px;color:var(--txt2);line-height:2}
+    /* TIMELINE */
+    .timeline{position:relative;padding-left:48px}
+    .timeline::before{content:'';position:absolute;left:12px;top:0;bottom:0;width:1px;background:var(--border)}
+    .timeline-item{position:relative;margin-bottom:40px}
+    .timeline-dot{position:absolute;left:-42px;top:6px;width:10px;height:10px;border-radius:50%;border:2px solid var(--accent);background:var(--bg);box-shadow:0 0 10px var(--accent-glow)}
+    .timeline-year{font-size:9px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase;margin-bottom:6px}
+    .timeline-title{font-family:var(--serif);font-size:21px;font-weight:300;color:var(--txt);margin-bottom:6px}
+    .timeline-genre{font-size:9px;letter-spacing:.22em;color:var(--txt3);text-transform:uppercase;margin-bottom:10px}
+    .timeline-desc{font-size:13px;color:var(--txt2);line-height:2;max-width:600px}
+    .timeline-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+    .timeline-tag{font-size:8px;letter-spacing:.18em;color:var(--txt3);border:1px solid var(--border);padding:2px 7px}
+    /* CORRELATION MAP */
+    .corr-wrap{position:relative;width:100%;overflow-x:auto;margin-bottom:48px}
+    .corr-svg{width:100%;min-width:600px}
+    /* MATRIX */
+    .matrix-wrap{overflow-x:auto;margin-bottom:48px}
+    .matrix-table{width:100%;border-collapse:collapse;font-size:12px}
+    .matrix-table th,.matrix-table td{border:1px solid var(--border);padding:10px 14px;text-align:left;transition:background .2s}
+    .matrix-table th{background:var(--surface);color:var(--txt2);font-size:9px;letter-spacing:.22em;text-transform:uppercase;font-weight:400}
+    .matrix-table td{color:var(--txt2);vertical-align:top;line-height:1.8}
+    .matrix-table tr:hover td{background:var(--deep)}
+    .matrix-table td:first-child{font-family:var(--serif);font-size:15px;color:var(--txt);white-space:nowrap}
+    .matrix-badge{display:inline-block;font-size:8px;letter-spacing:.14em;border:1px solid var(--border);padding:1px 6px;margin:1px;color:var(--txt3)}
+    .matrix-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle}
+    /* GALLERY SECTION TITLE */
+    .gal-sec{margin-bottom:48px}
+    .gal-sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+    .gal-sec-title{font-family:var(--serif);font-size:22px;font-weight:300;letter-spacing:.08em;color:var(--txt)}
+    .gal-sec-sub{font-size:10px;letter-spacing:.28em;color:var(--txt3);text-transform:uppercase}
+    /* READING DEPTH */
+    .depth-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1px;background:var(--border);margin-bottom:16px}
+    .depth-card{background:var(--bg);padding:22px 24px;transition:background .3s}.depth-card:hover{background:var(--deep)}
+    .depth-card-num{font-family:var(--serif);font-size:32px;font-weight:300;color:var(--accent);display:block;line-height:1}
+    .depth-card-lbl{font-size:9px;letter-spacing:.3em;color:var(--txt3);text-transform:uppercase;margin-top:4px;display:block}
+    /* ADMIN GALLERY */
+    .gal-admin-item{background:var(--bg);border-bottom:1px solid var(--border);padding:14px 0}
+    .gal-admin-textarea{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--txt);font-family:var(--body);font-size:13px;padding:10px 12px;resize:vertical;border-radius:2px;line-height:1.9}
+    .gal-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start;margin-bottom:10px}
+    @keyframes quoteIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}.quote-animate{animation:quoteIn .5s ease forwards}
+    @media(max-width:680px){
+      .gallery-wrap{padding:100px 20px 80px}
+      .quote-stage-content{padding:40px 24px}
+      .motif-row{grid-template-columns:1fr}
+    }
     @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes driftDown{0%{transform:translateY(-120px)}100%{transform:translateY(100vh)}}
-    /* ページ遷移オーバーレイ */
-    .pt-overlay{position:fixed;inset:0;z-index:8000;pointer-events:none;display:flex;align-items:center;justify-content:center;background:transparent}
-    .pt-ink-bg{position:absolute;inset:0;background:var(--bg);opacity:0}
-    .pt-kanji-svg{position:relative;z-index:1}
-    @keyframes ptBgIn{0%{opacity:0}100%{opacity:1}}
-    @keyframes ptBgOut{0%{opacity:1}100%{opacity:0}}
-    @keyframes ptKanjiOut{0%{opacity:1}50%{opacity:.6}100%{opacity:0}}
-    @keyframes ptColAppear{0%{transform:scaleY(0);transform-origin:top}100%{transform:scaleY(1);transform-origin:top}}
-    @keyframes ptColFade{0%{opacity:1}100%{opacity:0}}
-    @keyframes ptGridFadeOut{0%{opacity:1}60%{opacity:.7}100%{opacity:0}}
-    .pt-grid-overlay{position:fixed;inset:0;z-index:8000;pointer-events:none;display:flex;flex-direction:row-reverse;align-items:stretch}
-    .pt-grid-col{height:100%;display:flex;flex-direction:column;opacity:0}
-    .pt-grid-cell{border:1px solid;flex-shrink:0}
-    .pt-overlay{position:fixed;inset:0;z-index:8000;pointer-events:none;overflow:hidden}
-    .pt-ink{position:absolute;inset:0;background:var(--bg);transform-origin:center;opacity:0}
-    .pt-slide{position:absolute;inset:0;background:var(--bg);transform:translateX(-100%)}
-    .pt-char{position:fixed;font-family:var(--serif);color:var(--txt2);pointer-events:none;z-index:8001;opacity:0;font-size:18px;transition:none}
-    @keyframes ptCharScatter{0%{opacity:.7;transform:translate(0,0) rotate(0deg) scale(1)}100%{opacity:0;transform:var(--tx) rotate(var(--rot)) scale(.4)}}
-    @keyframes ptInkIn{0%{opacity:0}60%{opacity:1}100%{opacity:1}}
-    @keyframes ptInkOut{0%{opacity:1}100%{opacity:0}}
-    @keyframes ptSlideIn{0%{transform:translateX(-6%)}100%{transform:translateX(0)}}
-    @keyframes driftUp{0%{transform:translateY(110vh)}100%{transform:translateY(-120px)}}
-    .bg-text-layer{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
-    .bg-text-col{position:absolute;top:0;display:flex;flex-direction:column;gap:2.2em;writing-mode:vertical-rl;text-orientation:mixed;font-family:var(--serif);white-space:nowrap;will-change:transform}
     .rise{animation:rise .6s ease forwards;opacity:0}.d1{animation-delay:.04s}.d2{animation-delay:.14s}.d3{animation-delay:.26s}.d4{animation-delay:.38s}
     @keyframes fadein{from{opacity:0}to{opacity:1}}.fadein{animation:fadein .3s ease forwards}
     ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border-hi)}
     @media(max-width:680px){
       .nav{padding:0 16px}.hero{padding:100px 20px 60px}.section,.detail-body{padding-left:20px;padding-right:20px}
-      .detail-hero-content{padding:0 20px}.reading-content{padding-left:20px;padding-right:20px;padding-top:72px}.reading-foot{padding-left:20px;padding-right:20px}
+      .detail-hero-content{padding:0 20px}.reading-content,.reading-foot{padding-left:20px;padding-right:20px}
       .profile-wrap,.htg-wrap{padding:100px 20px 72px}.footer{padding:32px 20px}
-      .admin-overlay{flex-direction:column}
-      /* モバイル：メニュー選択前はサイドバーのみ、選択後はメインのみ */
-      .admin-sidebar{width:100%;max-height:none;height:100%}
-      .admin-main{display:none;padding:20px 16px 120px}
-      .admin-overlay.menu-selected .admin-sidebar{display:none}
-      .admin-overlay.menu-selected .admin-main{display:block}
-      .save-bar{left:0}
-      .form-row{grid-template-columns:1fr}
-      /* モバイル戻るボタン */
-      .mobile-back-btn{display:flex;align-items:center;gap:8px;background:none;border:none;color:var(--accent);font-family:var(--body);font-size:13px;letter-spacing:.08em;padding:0 0 20px;cursor:pointer}
+      .admin-overlay{flex-direction:column}.admin-sidebar{width:100%;max-height:220px}
+      .save-bar{left:0}.admin-main{padding:20px 16px 120px}.form-row{grid-template-columns:1fr}
     }
   `);
 }
@@ -612,7 +672,7 @@ function useReadingProgress(){
 }
 
 // ═══════════════ NAV ═══════════════
-function Nav({page,onNav,site,onLogoClick,lightMode,onToggleLight}){
+function Nav({page,onNav,site,onLogoClick}){
   return(
     <nav className="nav">
       <div className="nav-logo" onClick={()=>{ onNav("home"); if(onLogoClick)onLogoClick(); }}>
@@ -621,48 +681,26 @@ function Nav({page,onNav,site,onLogoClick,lightMode,onToggleLight}){
       </div>
       <div className="nav-center">
         <button className={`nav-btn ${page==="home"?"active":""}`} onClick={()=>onNav("home")}>作品一覧</button>
+        <button className={`nav-btn ${page==="gallery"?"active":""}`} onClick={()=>onNav("gallery")}>ギャラリー</button>
         <button className={`nav-btn ${page==="hitorigoto"?"active":""}`} onClick={()=>onNav("hitorigoto")}>ひとりごと</button>
         <button className={`nav-btn ${page==="profile"?"active":""}`} onClick={()=>onNav("profile")}>著者</button>
       </div>
-      <button onClick={onToggleLight} style={{background:"none",border:"1px solid var(--border)",borderRadius:20,padding:"4px 14px",cursor:"pointer",fontSize:10,letterSpacing:".18em",color:"var(--txt2)",lineHeight:1.6,transition:"all .2s"}}>
-        {lightMode?"DARK":"LIGHT"}
-      </button>
+
     </nav>
   );
 }
 
 // ═══════════════ HOME ═══════════════
-// 本文から文字数を実カウント（空白・改行除く）
-function countChars(novel) {
-  return (novel.chapters||[]).reduce((s,ch)=>s+(ch.content||"").replace(/\s/g,"").length, 0);
-}
-function fmtCount(n) {
-  if(n===0) return "0字";
-  if(n>=10000) return `${(n/10000).toFixed(1)}万字`;
-  return `${n.toLocaleString()}字`;
-}
-
 function HomePage({site,novels,onOpen}){
   const [activeTag,setActiveTag]=useState(null);
   const [byDate,setByDate]=useState(false);
   const allTags=useMemo(()=>[...new Set(novels.flatMap(n=>n.tags||[]))] ,[novels]);
 
-  // order順 → ピン固定を先頭に
-  const sorted=useMemo(()=>{
-    const ordered=[...novels].sort((a,b)=>(a.order??9999)-(b.order??9999));
-    const pinned=ordered.filter(n=>n.pinned);
-    const rest=ordered.filter(n=>!n.pinned);
-    return [...pinned,...rest];
-  },[novels]);
-
   const filtered=useMemo(()=>{
-    let list=sorted;
+    let list=novels;
     if(activeTag) list=list.filter(n=>(n.tags||[]).includes(activeTag));
     return list;
-  },[sorted,activeTag]);
-
-  // 総文字数（全作品）
-  const totalChars=useMemo(()=>novels.reduce((s,n)=>s+countChars(n),0),[novels]);
+  },[novels,activeTag]);
 
   const grouped=useMemo(()=>groupByYM(filtered,n=>n.updated),[filtered]);
 
@@ -677,14 +715,13 @@ function HomePage({site,novels,onOpen}){
             <div className="nc-cover">
               <div className="nc-cover-bg" style={{background:`linear-gradient(160deg,${n.color1},${n.color2})`}}/>
               <div className="nc-cover-fade"/><div className="nc-dot" style={{background:n.accent,boxShadow:`0 0 12px ${n.accent}88`}}/>
-              {n.pinned&&<div style={{position:"absolute",top:12,left:12,fontSize:10,background:"var(--accent)",color:"var(--bg)",padding:"2px 7px",borderRadius:2,letterSpacing:".08em"}}>📌 固定</div>}
             </div>
             <div className="nc-body">
               <div className="nc-tags">{(n.tags||[]).slice(0,3).map(t=><span key={t} className="nc-tag">{t}</span>)}</div>
               <div className="nc-title">{n.title}</div>
               <div className="nc-subtitle">{n.subtitle}</div>
               <div className="nc-desc">{n.description}</div>
-              <div className="nc-footer"><span className="nc-author">{n.author}</span><span className="nc-words">{fmtCount(countChars(n))}</span></div>
+              <div className="nc-footer"><span className="nc-author">{n.author}</span><span className="nc-words">{n.wordCount}</span></div>
             </div>
           </div>
         ))
@@ -701,7 +738,6 @@ function HomePage({site,novels,onOpen}){
         <div className="hero-stats rise d4">
           <div><span className="hero-stat-num">{novels.length}</span><span className="hero-stat-lbl">作品</span></div>
           <div><span className="hero-stat-num">{novels.reduce((s,n)=>s+(n.chapters||[]).length,0)}</span><span className="hero-stat-lbl">章</span></div>
-          <div><span className="hero-stat-num">{fmtCount(totalChars)}</span><span className="hero-stat-lbl">総文字数</span></div>
         </div>
       </section>
       <section className="section">
@@ -773,20 +809,6 @@ function DetailPage({novel,onBack,onRead,onSendMessage}){
 }
 
 // ═══════════════ READING ═══════════════
-// 改行ルール：1改行→段落、空行（連続改行）→そのまま空白として表示
-function renderBody(content, indent=true) {
-  const lines = content.split("\n");
-  const result = [];
-  lines.forEach((line, i) => {
-    if (line.trim() === "") {
-      result.push(<div key={`blank-${i}`} style={{height:"1.4em"}}/>);
-    } else {
-      result.push(<p key={`p-${i}`} style={{textIndent: indent ? "1em" : "0"}}>{line}</p>);
-    }
-  });
-  return result;
-}
-
 function ReadingPage({novel,chapterId,onBack,onChapter}){
   const ch=(novel.chapters||[]).find(c=>c.id===chapterId);
   const idx=(novel.chapters||[]).findIndex(c=>c.id===chapterId);
@@ -796,16 +818,16 @@ function ReadingPage({novel,chapterId,onBack,onChapter}){
   useEffect(()=>window.scrollTo({top:0,behavior:"smooth"}),[chapterId]);
   if(!ch)return null;
   return(
-    <div className="reading-wrap">
+    <div>
       <div className="reading-nav">
         <button className="reading-back" onClick={onBack}>←</button>
         <div className="reading-crumb"><b>{novel.title}</b>　／　{ch.title}</div>
       </div>
       <div className="progress-rail"><div className="progress-fill" style={{width:`${progress}%`}}/></div>
       <div className="reading-content">
-        <div className="reading-eyebrow rise d1">{String(idx+1).padStart(2,"0")} / {(novel.chapters||[]).length}</div>
+        <div className="reading-eyebrow rise d1">Chapter {String(idx+1).padStart(2,"0")} of {(novel.chapters||[]).length}</div>
         <h2 className="reading-ch-title rise d2">{ch.title}</h2>
-        <div className="reading-body rise d3">{renderBody(ch.content, novel.indent!==false)}</div>
+        <div className="reading-body rise d3">{ch.content.split("\n\n").filter(Boolean).map((p,i)=><p key={i}>{p}</p>)}</div>
       </div>
       <div className="reading-foot">
         <button className="reading-foot-btn" disabled={!prev} onClick={()=>prev&&onChapter(prev.id)}>← 前の章</button>
@@ -822,12 +844,7 @@ function HitorigotoPage({author}){
   const [byDate,setByDate]=useState(false);
   const murmurs=useMemo(()=>author.murmurs||[],[author.murmurs]);
   const filtered=murmurs;
-  // 古い順に並べ直してからグループ化
-  const sortedAsc=useMemo(()=>[...filtered].sort((a,b)=>{
-    const da=new Date(a.isoDate||a.date), db2=new Date(b.isoDate||b.date);
-    return da-db2;
-  }),[filtered]);
-  const grouped=useMemo(()=>groupByYM(sortedAsc,m=>m.isoDate||m.date),[sortedAsc]);
+  const grouped=useMemo(()=>groupByYM(filtered,m=>m.isoDate||m.date),[filtered]);
 
   const renderList=list=>(
     list.length===0
@@ -924,65 +941,727 @@ function ProfilePage({author,novels,onToWorks,site,onSendMessage}){
   );
 }
 
-// ひとりごと編集リスト
-function MurmurEditList({murmurs, onUpdate, onDelete}){
-  const [editId, setEditId] = useState(null);
-  const [editText, setEditText] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const startEdit = m => { setEditId(m.id); setEditText(m.text); };
-  const cancelEdit = () => { setEditId(null); setEditText(""); };
-  const saveEdit = async id => {
-    setSaving(true);
-    await onUpdate(id, editText);
-    setSaving(false);
-    setEditId(null);
-  };
-
-  if(murmurs.length===0) return <div style={{padding:"16px",color:"var(--txt3)",fontSize:13}}>まだ投稿がありません</div>;
+// ═══════════════ GALLERY ADMIN FORMS ═══════════════
+function GalleryQuoteForm({novels, gallery, setGallery, flash, saved}){
+  const [nt,setNt]=useState(""); const [nno,setNno]=useState(""); const [nch,setNch]=useState("");
+  const selNov=novels.find(n=>n.id===nno);
   return(
-    <div className="msg-list">
-      {murmurs.map(m=>(
-        <div key={m.id} className="msg-row" style={{cursor:"default"}}>
-          {editId===m.id ? (
-            <>
-              <textarea className="form-textarea" value={editText} onChange={e=>setEditText(e.target.value)} rows={4} style={{marginBottom:8}}/>
-              <div style={{display:"flex",gap:8}}>
-                <button className="btn btn-primary" disabled={saving} onClick={()=>saveEdit(m.id)} style={{fontSize:12,padding:"4px 14px"}}>{saving?"保存中…":"保存"}</button>
-                <button className="btn" onClick={cancelEdit} style={{fontSize:12,padding:"4px 14px"}}>キャンセル</button>
-              </div>
-            </>
-          ) : (
-            <div className="msg-body" style={{whiteSpace:"pre-wrap"}}>{m.text}</div>
-          )}
-          {(m.files||[]).length>0&&<div style={{display:"flex",gap:6,marginTop:8}}>
-            {(m.files||[]).map((f,i)=>f.type==="image"
-              ?<img key={i} src={f.data} alt="" style={{width:48,height:48,objectFit:"cover",border:"1px solid var(--border)",borderRadius:2}}/>
-              :<span key={i} style={{fontSize:11,color:"var(--txt3)"}}>📎{f.name}</span>)}
-          </div>}
-          <div className="msg-acts">
-            <span className="msg-date">{m.date}</span>
-            <div style={{marginLeft:"auto",display:"flex",gap:6}}>
-              {editId!==m.id&&<button className="icon-btn" style={{fontSize:11}} onClick={()=>startEdit(m)}>✏️ 編集</button>}
-              <button className="icon-btn danger" style={{fontSize:11}} onClick={()=>onDelete(m.id)}>🗑 削除</button>
+    <>
+      <div style={{background:"var(--surface)",border:"1px solid var(--border)",padding:20,borderRadius:2,marginBottom:24}}>
+        <div className="admin-title" style={{fontSize:16,marginBottom:16}}>＋ 新しい名文を追加</div>
+        <div className="form-group">
+          <label className="form-label">テキスト</label>
+          <textarea className="form-textarea" rows={4} value={nt} onChange={e=>setNt(e.target.value)} placeholder="本文中の名文・名言を入力…" style={{fontFamily:"'Noto Serif JP',serif",fontSize:14,lineHeight:2}}/>
+        </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label className="form-label">作品を選択</label>
+            <select className="form-input" value={nno} onChange={e=>{setNno(e.target.value);setNch("");}}>
+              <option value="">-- 作品を選択 --</option>
+              {novels.map(n=><option key={n.id} value={n.id}>{n.title}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">章（任意）</label>
+            <select className="form-input" value={nch} onChange={e=>setNch(e.target.value)} disabled={!selNov}>
+              <option value="">-- 章を選択 --</option>
+              {(selNov?.chapters||[]).map(c=><option key={c.id} value={c.title}>{c.title}</option>)}
+            </select>
+          </div>
+        </div>
+        <button className="btn btn-primary" disabled={!nt.trim()||!nno} onClick={async()=>{
+          const nov=novels.find(n=>n.id===nno);
+          const newQ={id:`q${Date.now()}`,text:nt.trim(),novelId:nno,novelTitle:nov?.title||"",chapter:nch};
+          await flash(()=>setGallery(g=>({...g,quotes:[...(g.quotes||[]),newQ]})));
+          setNt(""); setNno(""); setNch("");
+        }}>追加する</button>
+        {saved&&<span style={{marginLeft:12,fontSize:12,color:"var(--accent)"}}>✓ 追加しました</span>}
+      </div>
+      <div className="msg-list">
+        {(gallery?.quotes||[]).length===0&&<div style={{padding:"16px",color:"var(--txt3)",fontSize:13}}>まだ名文が登録されていません</div>}
+        {(gallery?.quotes||[]).map((q,i)=>(
+          <div key={q.id} className="msg-row" style={{cursor:"default"}}>
+            <div className="msg-body" style={{fontFamily:"'Noto Serif JP',serif",fontStyle:"italic"}}>「{q.text}」</div>
+            <div style={{marginTop:6,fontSize:11,color:"var(--txt3)"}}>『{q.novelTitle}』 {q.chapter&&`/ ${q.chapter}`}</div>
+            <div className="msg-acts">
+              <button className="icon-btn danger" style={{fontSize:11,marginLeft:"auto"}} onClick={()=>
+                flash(()=>setGallery(g=>({...g,quotes:(g.quotes||[]).filter((_,j)=>j!==i)})))
+              }>🗑 削除</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function GalleryCharForm({novels, gallery, setGallery, flash, saved}){
+  const [cn,setCn]=useState(""); const [cr,setCr]=useState("主人公");
+  const [cno,setCno]=useState(""); const [cd,setCd]=useState("");
+  const [ct,setCt]=useState(""); const [ca,setCa]=useState("#c8a86a");
+  const caRef=useRef();
+  return(
+    <>
+      <div style={{background:"var(--surface)",border:"1px solid var(--border)",padding:20,borderRadius:2,marginBottom:24}}>
+        <div className="admin-title" style={{fontSize:16,marginBottom:16}}>＋ 新しいキャラクターを追加</div>
+        <div className="form-row">
+          <div className="form-group"><label className="form-label">名前</label><input className="form-input" value={cn} onChange={e=>setCn(e.target.value)} placeholder="キャラクター名"/></div>
+          <div className="form-group"><label className="form-label">役割</label><input className="form-input" value={cr} onChange={e=>setCr(e.target.value)} placeholder="主人公・相棒・敵対者…"/></div>
+        </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label className="form-label">作品</label>
+            <select className="form-input" value={cno} onChange={e=>setCno(e.target.value)}>
+              <option value="">-- 作品を選択 --</option>
+              {novels.map(n=><option key={n.id} value={n.id}>{n.title}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">アクセント色</label>
+            <div className="color-row">
+              <div className="color-swatch" style={{background:ca}} onClick={()=>caRef.current?.click()}/>
+              <input ref={caRef} type="color" value={ca} onChange={e=>setCa(e.target.value)} className="color-input-hidden"/>
+              <input className="form-input" style={{flex:1}} value={ca} onChange={e=>setCa(e.target.value)}/>
             </div>
           </div>
         </div>
-      ))}
-    </div>
+        <div className="form-group"><label className="form-label">解説・分析</label><textarea className="form-textarea" rows={4} value={cd} onChange={e=>setCd(e.target.value)} placeholder="キャラクターの内面・役割・象徴性など…"/></div>
+        <div className="form-group"><label className="form-label">特性（カンマ区切り）</label><input className="form-input" value={ct} onChange={e=>setCt(e.target.value)} placeholder="内省的, 孤独, 二重人格…"/></div>
+        <button className="btn btn-primary" disabled={!cn.trim()||!cno} onClick={async()=>{
+          const nov=novels.find(n=>n.id===cno);
+          const newC={id:`c${Date.now()}`,name:cn.trim(),role:cr.trim(),novelId:cno,novelTitle:nov?.title||"",description:cd.trim(),traits:ct.split(",").map(s=>s.trim()).filter(Boolean),accent:ca};
+          await flash(()=>setGallery(g=>({...g,characters:[...(g.characters||[]),newC]})));
+          setCn(""); setCr("主人公"); setCno(""); setCd(""); setCt(""); setCa("#c8a86a");
+        }}>追加する</button>
+        {saved&&<span style={{marginLeft:12,fontSize:12,color:"var(--accent)"}}>✓ 追加しました</span>}
+      </div>
+      <div className="alist">
+        {(gallery?.characters||[]).length===0&&<div style={{padding:"16px",color:"var(--txt3)",fontSize:13}}>キャラクターがまだ登録されていません</div>}
+        {(gallery?.characters||[]).map((c,i)=>(
+          <div key={c.id} className="arow">
+            <div className="arow-dot" style={{background:c.accent||"var(--accent)",boxShadow:`0 0 8px ${c.accent}66`}}/>
+            <div className="arow-info">
+              <div className="arow-title">{c.name} <span style={{fontSize:11,color:"var(--txt3)",fontWeight:400}}>（{c.role}）</span></div>
+              <div className="arow-meta">『{c.novelTitle}』 · {(c.traits||[]).join("・")}</div>
+            </div>
+            <button className="icon-btn danger" onClick={()=>flash(()=>setGallery(g=>({...g,characters:(g.characters||[]).filter((_,j)=>j!==i)})))}>🗑</button>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function GalleryThemeForm({novels, gallery, setGallery, flash, saved}){
+  const [tt,setTt]=useState(""); const [td,setTd]=useState(""); const [tno,setTno]=useState("");
+  const [mk,setMk]=useState(""); const [md,setMd]=useState(""); const [mnids,setMnids]=useState([]);
+  return(
+    <>
+      {/* 主題 */}
+      <div style={{background:"var(--surface)",border:"1px solid var(--border)",padding:20,borderRadius:2,marginBottom:24}}>
+        <div className="admin-title" style={{fontSize:16,marginBottom:16}}>＋ 主題を追加</div>
+        <div className="form-row">
+          <div className="form-group"><label className="form-label">主題タイトル</label><input className="form-input" value={tt} onChange={e=>setTt(e.target.value)} placeholder="自己同一性の崩壊"/></div>
+          <div className="form-group">
+            <label className="form-label">作品</label>
+            <select className="form-input" value={tno} onChange={e=>setTno(e.target.value)}>
+              <option value="">-- 作品を選択 --</option>
+              {novels.map(n=><option key={n.id} value={n.id}>{n.title}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="form-group"><label className="form-label">考察・解説</label><textarea className="form-textarea" rows={3} value={td} onChange={e=>setTd(e.target.value)} placeholder="このテーマがなぜ重要か、どう描かれているか…"/></div>
+        <button className="btn btn-primary" disabled={!tt.trim()||!tno} onClick={async()=>{
+          const nov=novels.find(n=>n.id===tno);
+          const newT={id:`t${Date.now()}`,title:tt.trim(),description:td.trim(),novelId:tno,novelTitle:nov?.title||""};
+          await flash(()=>setGallery(g=>({...g,themes:[...(g.themes||[]),newT]})));
+          setTt(""); setTd(""); setTno("");
+        }}>追加する</button>
+        {saved&&<span style={{marginLeft:12,fontSize:12,color:"var(--accent)"}}>✓ 追加しました</span>}
+      </div>
+      <div className="alist" style={{marginBottom:32}}>
+        {(gallery?.themes||[]).length===0&&<div style={{padding:"16px",color:"var(--txt3)",fontSize:13}}>主題がまだ登録されていません</div>}
+        {(gallery?.themes||[]).map((th,i)=>(
+          <div key={th.id} className="arow">
+            <div className="arow-info">
+              <div className="arow-title">{th.title}</div>
+              <div className="arow-meta">『{th.novelTitle}』 · {(th.description||"").slice(0,40)}{th.description?.length>40?"…":""}</div>
+            </div>
+            <button className="icon-btn danger" onClick={()=>flash(()=>setGallery(g=>({...g,themes:(g.themes||[]).filter((_,j)=>j!==i)})))}>🗑</button>
+          </div>
+        ))}
+      </div>
+
+      {/* モチーフ */}
+      <div style={{background:"var(--surface)",border:"1px solid var(--border)",padding:20,borderRadius:2,marginBottom:24}}>
+        <div className="admin-title" style={{fontSize:16,marginBottom:16}}>＋ モチーフを追加</div>
+        <div className="form-group"><label className="form-label">キーワード</label><input className="form-input" value={mk} onChange={e=>setMk(e.target.value)} placeholder="鏡、夜明け前、名前のない主人公…"/></div>
+        <div className="form-group"><label className="form-label">解説</label><textarea className="form-textarea" rows={3} value={md} onChange={e=>setMd(e.target.value)} placeholder="このモチーフが作品群でどのように機能しているか…"/></div>
+        <div className="form-group">
+          <label className="form-label">関連作品（複数選択可）</label>
+          <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:8}}>
+            {novels.map(n=>(
+              <label key={n.id} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--txt2)",cursor:"pointer"}}>
+                <input type="checkbox" checked={mnids.includes(n.id)} onChange={e=>setMnids(p=>e.target.checked?[...p,n.id]:p.filter(id=>id!==n.id))}/>
+                {n.title}
+              </label>
+            ))}
+          </div>
+        </div>
+        <button className="btn btn-primary" disabled={!mk.trim()} onClick={async()=>{
+          const newM={id:`m${Date.now()}`,keyword:mk.trim(),description:md.trim(),novelIds:mnids};
+          await flash(()=>setGallery(g=>({...g,motifs:[...(g.motifs||[]),newM]})));
+          setMk(""); setMd(""); setMnids([]);
+        }}>追加する</button>
+        {saved&&<span style={{marginLeft:12,fontSize:12,color:"var(--accent)"}}>✓ 追加しました</span>}
+      </div>
+      <div className="alist" style={{marginBottom:32}}>
+        {(gallery?.motifs||[]).length===0&&<div style={{padding:"16px",color:"var(--txt3)",fontSize:13}}>モチーフがまだ登録されていません</div>}
+        {(gallery?.motifs||[]).map((m,i)=>(
+          <div key={m.id} className="arow">
+            <div className="arow-info">
+              <div className="arow-title">{m.keyword}</div>
+              <div className="arow-meta">{(m.description||"").slice(0,50)}{m.description?.length>50?"…":""}</div>
+            </div>
+            <button className="icon-btn danger" onClick={()=>flash(()=>setGallery(g=>({...g,motifs:(g.motifs||[]).filter((_,j)=>j!==i)})))}>🗑</button>
+          </div>
+        ))}
+      </div>
+
+      {/* 作者ノート */}
+      <div className="form-group">
+        <label className="form-label">作者ノート（主題ページに表示）</label>
+        <textarea className="form-textarea" rows={6} value={gallery?.notes||""} onChange={e=>setGallery(g=>({...g,notes:e.target.value}))} placeholder="作品全体を通じた思いや、執筆意図など…"/>
+      </div>
+      <button className="btn btn-primary" onClick={()=>flash()}>保存する</button>
+      {saved&&<span style={{marginLeft:12,fontSize:12,color:"var(--accent)"}}>✓ 保存しました</span>}
+    </>
+  );
+}
+
+// ═══════════════ GALLERY ═══════════════
+function GalleryPage({gallery, novels, site}){
+  const [tab, setTab] = useState("quotes");
+  const [quoteIdx, setQuoteIdx] = useState(0);
+  const [quoteAnim, setQuoteAnim] = useState(true);
+
+  const quotes = gallery?.quotes || [];
+  const characters = gallery?.characters || [];
+  const themes = gallery?.themes || [];
+  const motifs = gallery?.motifs || [];
+
+  // 名言をランダムに並び替え（初回のみ）
+  const shuffled = useMemo(()=>{
+    const arr=[...quotes];
+    for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}
+    return arr;
+  },[quotes.length]);
+
+  const currentQuote = shuffled[quoteIdx] || null;
+
+  const nextQuote = useCallback(()=>{
+    setQuoteAnim(false);
+    setTimeout(()=>{
+      setQuoteIdx(i=>(i+1)%Math.max(shuffled.length,1));
+      setQuoteAnim(true);
+    },200);
+  },[shuffled.length]);
+
+  useEffect(()=>{
+    if(!shuffled.length)return;
+    const t=setInterval(nextQuote,7000);
+    return()=>clearInterval(t);
+  },[nextQuote,shuffled.length]);
+
+  // 作風変遷（更新日でソート）
+  const timeline = useMemo(()=>[...novels].sort((a,b)=>new Date(a.updated)-new Date(b.updated)),[novels]);
+
+  // 作品マップ用データ
+  const genres = [...new Set(novels.map(n=>n.genre).filter(Boolean))];
+  const allTags = [...new Set(novels.flatMap(n=>n.tags||[]))];
+
+  // 作品相関図（SVG）
+  const corrData = useMemo(()=>{
+    const cx=300, cy=180, r=120;
+    const nodes = novels.map((n,i)=>{
+      const angle = (2*Math.PI*i/Math.max(novels.length,1)) - Math.PI/2;
+      return { ...n, x: cx+r*Math.cos(angle), y: cy+r*Math.sin(angle) };
+    });
+    // 共通タグのある作品をエッジで繋ぐ
+    const edges=[];
+    for(let i=0;i<nodes.length;i++){
+      for(let j=i+1;j<nodes.length;j++){
+        const common=(nodes[i].tags||[]).filter(t=>(nodes[j].tags||[]).includes(t));
+        if(common.length>0) edges.push({from:nodes[i],to:nodes[j],label:common[0]});
+      }
+    }
+    return{nodes,edges,cx,cy};
+  },[novels]);
+
+  // 統計データ
+  const stats = useMemo(()=>({
+    totalWords: novels.reduce((s,n)=>{
+      const m=String(n.wordCount||"").replace(/[^0-9]/g,"");
+      return s+(m?parseInt(m):0);
+    },0),
+    totalChapters: novels.reduce((s,n)=>s+(n.chapters||[]).length,0),
+    totalNovels: novels.length,
+    genreCount: new Set(novels.map(n=>n.genre)).size,
+    tagCount: new Set(novels.flatMap(n=>n.tags||[])).size,
+    charCount: characters.length,
+    quoteCount: quotes.length,
+  }),[novels,characters,quotes]);
+
+  const tabs=[
+    {id:"quotes",   label:"名言・名文"},
+    {id:"chars",    label:"キャラクター"},
+    {id:"themes",   label:"主題・考察"},
+    {id:"motifs",   label:"モチーフ"},
+    {id:"timeline", label:"作風変遷"},
+    {id:"relation", label:"作品相関図"},
+    {id:"map",      label:"作品マップ"},
+    {id:"stats",    label:"データ集計"},
+  ];
+
+  return(
+    <>
+      <div className="gallery-wrap">
+        {/* ヘッダー */}
+        <div className="gallery-hero rise d1">
+          <div className="gallery-hero-eyebrow">Literary Gallery</div>
+          <h1 className="gallery-hero-title">
+            ギャラリー<em>。</em>
+          </h1>
+          <p className="gallery-hero-desc">
+            言葉と物語の記録。名言、人物、主題、モチーフ、作風の変遷——<br/>
+            すべての作品が増えるごとに、この場所も深くなっていく。
+          </p>
+        </div>
+
+        {/* タブ */}
+        <div className="gallery-tabs rise d2">
+          {tabs.map(t=>(
+            <button key={t.id} className={`gallery-tab ${tab===t.id?"active":""}`} onClick={()=>setTab(t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── 名言・名文 ── */}
+        {tab==="quotes"&&(
+          <div className="fadein">
+            {/* メインステージ */}
+            {currentQuote?(
+              <div className="quote-stage" onClick={nextQuote}>
+                <div className="quote-stage-bg"/>
+                <div className={`quote-stage-content ${quoteAnim?"quote-animate":""}`} key={quoteIdx}>
+                  <div className="quote-text">{currentQuote.text}</div>
+                  <div className="quote-source">
+                    {currentQuote.novelTitle}<span>/</span>{currentQuote.chapter||""}
+                  </div>
+                  <div className="quote-dots">
+                    {shuffled.map((_,i)=>(
+                      <div key={i} className={`quote-dot ${i===quoteIdx?"active":""}`}
+                        onClick={e=>{e.stopPropagation();setQuoteIdx(i);}}/>
+                    ))}
+                  </div>
+                </div>
+                <div className="quote-hint">クリックで次の名文へ →</div>
+              </div>
+            ):(
+              <div className="quote-stage">
+                <div style={{color:"var(--txt3)",fontSize:13,letterSpacing:".1em"}}>名文がまだ登録されていません</div>
+              </div>
+            )}
+
+            {/* 一覧 */}
+            <div className="gal-sec">
+              <div className="gal-sec-head">
+                <div className="gal-sec-title">すべての名言・名文</div>
+                <div className="gal-sec-sub">{quotes.length} 選</div>
+              </div>
+              <div className="quote-grid">
+                {quotes.length===0&&(
+                  <div style={{padding:"48px 24px",color:"var(--txt3)",fontSize:13,background:"var(--bg)"}}>まだ登録されていません</div>
+                )}
+                {quotes.map(q=>(
+                  <div key={q.id} className="quote-card">
+                    <div className="quote-card-text">「{q.text}」</div>
+                    <div className="quote-card-source"><b>{q.novelTitle}</b> ／ {q.chapter||""}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── キャラクター解説・分析 ── */}
+        {tab==="chars"&&(
+          <div className="fadein">
+            <div className="gal-sec">
+              <div className="gal-sec-head">
+                <div className="gal-sec-title">登場人物</div>
+                <div className="gal-sec-sub">{characters.length} 人</div>
+              </div>
+              <div className="char-grid">
+                {characters.length===0&&(
+                  <div style={{padding:"48px 24px",color:"var(--txt3)",fontSize:13,background:"var(--bg)"}}>まだ登録されていません</div>
+                )}
+                {characters.map(c=>(
+                  <div key={c.id} className="char-card">
+                    <div className="char-card-top">
+                      <div className="char-avatar" style={{background:c.accent||"var(--accent)"}}>
+                        {c.name.charAt(0)}
+                      </div>
+                      <div>
+                        <div className="char-name">{c.name}</div>
+                        <div className="char-role">{c.role}</div>
+                        <div className="char-novel">『{c.novelTitle}』</div>
+                      </div>
+                    </div>
+                    <div className="char-desc">{c.description}</div>
+                    <div className="char-traits">
+                      {(c.traits||[]).map(tr=><span key={tr} className="char-trait">{tr}</span>)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── 主題・メッセージ考察 ── */}
+        {tab==="themes"&&(
+          <div className="fadein">
+            <div className="gal-sec">
+              <div className="gal-sec-head">
+                <div className="gal-sec-title">物語の主題とメッセージ</div>
+                <div className="gal-sec-sub">{themes.length} 項目</div>
+              </div>
+              <div className="theme-grid-gal">
+                {themes.length===0&&(
+                  <div style={{padding:"48px 24px",color:"var(--txt3)",fontSize:13,background:"var(--bg)"}}>まだ登録されていません</div>
+                )}
+                {themes.map(th=>(
+                  <div key={th.id} className="theme-card">
+                    <div className="theme-card-novel">『{th.novelTitle}』</div>
+                    <div className="theme-card-title">{th.title}</div>
+                    <div className="theme-card-desc">{th.description}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {gallery?.notes&&(
+              <div className="gal-sec">
+                <div className="gal-sec-head"><div className="gal-sec-title">作者ノート</div></div>
+                <div style={{fontFamily:"var(--serif)",fontSize:15,lineHeight:2.4,color:"var(--txt2)",maxWidth:680,whiteSpace:"pre-line",borderLeft:"2px solid var(--accent-glow)",paddingLeft:24}}>
+                  {gallery.notes}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── モチーフ ── */}
+        {tab==="motifs"&&(
+          <div className="fadein">
+            <div className="gal-sec">
+              <div className="gal-sec-head">
+                <div className="gal-sec-title">モチーフと作風の傾向</div>
+                <div className="gal-sec-sub">{motifs.length} 項目</div>
+              </div>
+              <div className="motif-list">
+                {motifs.length===0&&(
+                  <div style={{padding:"48px 24px",color:"var(--txt3)",fontSize:13,background:"var(--bg)"}}>まだ登録されていません</div>
+                )}
+                {motifs.map(m=>(
+                  <div key={m.id} className="motif-row">
+                    <div>
+                      <div className="motif-keyword">{m.keyword}</div>
+                      <div className="motif-works">
+                        {(m.novelIds||[]).map(nid=>{
+                          const nov=novels.find(n=>n.id===nid);
+                          return nov?<span key={nid} className="motif-work">『{nov.title}』</span>:null;
+                        })}
+                      </div>
+                    </div>
+                    <div className="motif-desc">{m.description}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── 作風変遷（タイムライン） ── */}
+        {tab==="timeline"&&(
+          <div className="fadein">
+            <div className="gal-sec">
+              <div className="gal-sec-head">
+                <div className="gal-sec-title">作風の変遷</div>
+                <div className="gal-sec-sub">時系列</div>
+              </div>
+              {timeline.length===0?(
+                <div style={{color:"var(--txt3)",fontSize:13,padding:"48px 0"}}>作品がまだありません</div>
+              ):(
+                <div className="timeline">
+                  {timeline.map(n=>(
+                    <div key={n.id} className="timeline-item">
+                      <div className="timeline-dot" style={{borderColor:n.accent||"var(--accent)",boxShadow:`0 0 10px ${n.accent||"var(--accent)"}66`}}/>
+                      <div className="timeline-year">{fmtDate(n.updated)}</div>
+                      <div className="timeline-title">{n.title}</div>
+                      <div className="timeline-genre">{n.genre}</div>
+                      <div className="timeline-desc">{n.description}</div>
+                      <div className="timeline-tags">
+                        {(n.tags||[]).map(t=><span key={t} className="timeline-tag">{t}</span>)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── 作品相関図 ── */}
+        {tab==="relation"&&(
+          <div className="fadein">
+            <div className="gal-sec">
+              <div className="gal-sec-head">
+                <div className="gal-sec-title">作品相関図</div>
+                <div className="gal-sec-sub">共通タグで繋がる作品群</div>
+              </div>
+              {novels.length===0?(
+                <div style={{color:"var(--txt3)",fontSize:13,padding:"48px 0"}}>作品がまだありません</div>
+              ):(
+                <div className="corr-wrap">
+                  <svg className="corr-svg" viewBox="0 0 600 360" style={{display:"block"}}>
+                    {/* エッジ */}
+                    {corrData.edges.map((e,i)=>(
+                      <g key={i}>
+                        <line x1={e.from.x} y1={e.from.y} x2={e.to.x} y2={e.to.y}
+                          stroke="rgba(200,168,106,0.2)" strokeWidth="1" strokeDasharray="4 3"/>
+                        <text x={(e.from.x+e.to.x)/2} y={(e.from.y+e.to.y)/2}
+                          fill="rgba(200,168,106,0.5)" fontSize="8" textAnchor="middle" dominantBaseline="middle"
+                          fontFamily="sans-serif" letterSpacing="1">{e.label}</text>
+                      </g>
+                    ))}
+                    {/* 中心ラベル */}
+                    {novels.length>1&&(
+                      <>
+                        <circle cx={corrData.cx} cy={corrData.cy} r="30" fill="none"
+                          stroke="rgba(200,168,106,0.08)" strokeWidth="60"/>
+                        <text x={corrData.cx} y={corrData.cy} fill="rgba(200,168,106,0.3)"
+                          fontSize="10" textAnchor="middle" dominantBaseline="middle"
+                          fontFamily="serif" letterSpacing="2">淵</text>
+                      </>
+                    )}
+                    {/* ノード */}
+                    {corrData.nodes.map(n=>(
+                      <g key={n.id}>
+                        <circle cx={n.x} cy={n.y} r="36" fill={n.color1||"#0a0a14"}
+                          stroke={n.accent||"#c8a86a"} strokeWidth="1.5" opacity=".9"/>
+                        <circle cx={n.x} cy={n.y} r="36" fill="none"
+                          stroke={n.accent||"#c8a86a"} strokeWidth="1" opacity=".25"/>
+                        <text x={n.x} y={n.y-4} fill="#e2ddd4" fontSize="11" textAnchor="middle"
+                          dominantBaseline="middle" fontFamily="serif" letterSpacing="1">{n.title}</text>
+                        <text x={n.x} y={n.y+10} fill={n.accent||"#c8a86a"} fontSize="7"
+                          textAnchor="middle" dominantBaseline="middle" fontFamily="sans-serif"
+                          letterSpacing="1" opacity=".7">{n.genre}</text>
+                      </g>
+                    ))}
+                  </svg>
+                  {corrData.edges.length===0&&novels.length>1&&(
+                    <div style={{textAlign:"center",color:"var(--txt3)",fontSize:12,marginTop:8}}>
+                      共通タグのある作品間に接続線が表示されます
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* 凡例 */}
+              <div style={{display:"flex",gap:20,flexWrap:"wrap",marginTop:24}}>
+                {novels.map(n=>(
+                  <div key={n.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:11,color:"var(--txt2)"}}>
+                    <div style={{width:10,height:10,borderRadius:"50%",background:n.accent||"var(--accent)",boxShadow:`0 0 6px ${n.accent}66`}}/>
+                    {n.title}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── 作品マップ（マトリックス表） ── */}
+        {tab==="map"&&(
+          <div className="fadein">
+            <div className="gal-sec">
+              <div className="gal-sec-head">
+                <div className="gal-sec-title">作品マップ</div>
+                <div className="gal-sec-sub">マトリックス表</div>
+              </div>
+              <div className="matrix-wrap">
+                <table className="matrix-table">
+                  <thead>
+                    <tr>
+                      <th>作品名</th>
+                      <th>ジャンル</th>
+                      <th>主題タグ</th>
+                      <th>文字数</th>
+                      <th>更新</th>
+                      <th>登場人物</th>
+                      <th>色調</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {novels.length===0?(
+                      <tr><td colSpan={7} style={{color:"var(--txt3)",padding:"32px"}}>作品がまだありません</td></tr>
+                    ):novels.map(n=>{
+                      const novelChars=characters.filter(c=>c.novelId===n.id);
+                      return(
+                        <tr key={n.id}>
+                          <td>
+                            <div style={{display:"flex",alignItems:"center",gap:8}}>
+                              <div className="matrix-dot" style={{background:n.accent||"var(--accent)",boxShadow:`0 0 6px ${n.accent}44`}}/>
+                              {n.title}
+                            </div>
+                          </td>
+                          <td>{n.genre}</td>
+                          <td>{(n.tags||[]).map(t=><span key={t} className="matrix-badge">{t}</span>)}</td>
+                          <td>{n.wordCount}</td>
+                          <td>{fmtDate(n.updated)}</td>
+                          <td>{novelChars.length>0?novelChars.map(c=>c.name).join("・"):"—"}</td>
+                          <td>
+                            <div style={{width:32,height:16,borderRadius:2,background:`linear-gradient(90deg,${n.color1},${n.color2})`,border:"1px solid rgba(255,255,255,.1)"}}/>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* タグ×作品マトリックス */}
+            {novels.length>0&&allTags.length>0&&(
+              <div className="gal-sec">
+                <div className="gal-sec-head">
+                  <div className="gal-sec-title">タグ × 作品 対応表</div>
+                </div>
+                <div className="matrix-wrap">
+                  <table className="matrix-table">
+                    <thead>
+                      <tr>
+                        <th>タグ</th>
+                        {novels.map(n=><th key={n.id}>{n.title}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allTags.map(tag=>(
+                        <tr key={tag}>
+                          <td style={{color:"var(--accent)",fontFamily:"var(--body)"}}>{tag}</td>
+                          {novels.map(n=>(
+                            <td key={n.id} style={{textAlign:"center"}}>
+                              {(n.tags||[]).includes(tag)
+                                ?<span style={{color:"var(--accent)"}}>●</span>
+                                :<span style={{color:"var(--border-hi)"}}>○</span>
+                              }
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── データ集計 ── */}
+        {tab==="stats"&&(
+          <div className="fadein">
+            <div className="gal-sec">
+              <div className="gal-sec-head">
+                <div className="gal-sec-title">データ集計</div>
+                <div className="gal-sec-sub">Numbers</div>
+              </div>
+              <div className="depth-grid">
+                {[
+                  {num:stats.totalNovels,lbl:"総作品数"},
+                  {num:stats.totalChapters,lbl:"総章数"},
+                  {num:stats.totalWords>0?stats.totalWords.toLocaleString()+"字":"—",lbl:"総文字数（概算）"},
+                  {num:stats.genreCount,lbl:"ジャンル数"},
+                  {num:stats.tagCount,lbl:"使用タグ数"},
+                  {num:stats.charCount,lbl:"登録キャラクター数"},
+                  {num:stats.quoteCount,lbl:"収録名文数"},
+                  {num:motifs.length,lbl:"収録モチーフ数"},
+                ].map((d,i)=>(
+                  <div key={i} className="depth-card">
+                    <span className="depth-card-num">{d.num}</span>
+                    <span className="depth-card-lbl">{d.lbl}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ジャンル分布 */}
+            {genres.length>0&&(
+              <div className="gal-sec">
+                <div className="gal-sec-head"><div className="gal-sec-title">ジャンル分布</div></div>
+                {genres.map(g=>{
+                  const cnt=novels.filter(n=>n.genre===g).length;
+                  const pct=Math.round(cnt/Math.max(novels.length,1)*100);
+                  return(
+                    <div key={g} style={{marginBottom:18}}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:6,fontSize:12,color:"var(--txt2)"}}>
+                        <span>{g}</span><span style={{color:"var(--accent)"}}>{cnt}作品 ({pct}%)</span>
+                      </div>
+                      <div style={{height:3,background:"var(--border)",borderRadius:2,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:`${pct}%`,background:"var(--accent)",transition:"width .8s ease",borderRadius:2}}/>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* タグ頻度 */}
+            {allTags.length>0&&(
+              <div className="gal-sec">
+                <div className="gal-sec-head"><div className="gal-sec-title">タグ頻度</div></div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {allTags.map(tag=>{
+                    const cnt=novels.filter(n=>(n.tags||[]).includes(tag)).length;
+                    const size=12+cnt*3;
+                    return(
+                      <span key={tag} style={{
+                        fontSize:size,fontFamily:"var(--serif)",color:`color-mix(in srgb,var(--accent) ${30+cnt*20}%,var(--txt3) ${70-cnt*20}%)`,
+                        border:"1px solid var(--border)",padding:"4px 12px",transition:"all .3s"
+                      }}>{tag}</span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
+      <Footer site={site||{}}/>
+    </>
   );
 }
 
 // ═══════════════ ADMIN ═══════════════
 function AdminPanel({store,onClose}){
   const {site,setSite,author,setAuthor,novels,messages,deleteMessage,markRead,
-    addNovel,updateNovel,deleteNovel,addChapter,updateChapter,deleteChapter,addMurmur,deleteMurmur,updateMurmur}=store;
+    gallery,setGallery,
+    addNovel,updateNovel,deleteNovel,addChapter,updateChapter,deleteChapter,addMurmur,deleteMurmur}=store;
   const [sec,setSec]=useState("site");
   const [editNid,setEditNid]=useState(null);
   const [editCh,setEditCh]=useState(null);
   const [delConfirm,setDelConfirm]=useState(null);
   const [saved,setSaved]=useState(false);
-  const [murmurErr,setMurmurErr]=useState("");
   const [newMurmur,setNewMurmur]=useState("");
   const [newFiles,setNewFiles]=useState([]);
   const [newLL,setNewLL]=useState(""); const [newLU,setNewLU]=useState("");
@@ -1016,27 +1695,21 @@ function AdminPanel({store,onClose}){
     {id:"messages",label:"受信メッセージ",icon:"✉️",badge:unread},
     {id:"theme",label:"デザイン・テーマ",icon:"🎨"},
     {id:"novels",label:"作品管理",icon:"📚"},
+    {id:"gallery_quotes",label:"名言・名文",icon:"💬"},
+    {id:"gallery_chars",label:"キャラクター",icon:"👤"},
+    {id:"gallery_themes",label:"主題・モチーフ",icon:"🔍"},
   ];
 
-  const [menuSelected, setMenuSelected] = useState(false);
-
-  // スマホ：メニュー項目を選択したら全画面コンテンツ表示
-  const selectSec = (id) => {
-    setSec(id); setEditNid(null); setEditCh(null);
-    setMenuSelected(true);
-  };
-  const goBackToMenu = () => setMenuSelected(false);
-
   return(
-    <div className={`admin-overlay fadein${menuSelected?" menu-selected":""}`}>
+    <div className="admin-overlay fadein">
       <div className="admin-sidebar">
-        <div className="admin-logo" onClick={onClose} style={{cursor:"pointer"}} title="閲覧ページに戻る"><div className="admin-logo-txt">管理パネル</div><div className="admin-logo-sub" style={{letterSpacing:".2em"}}>← tap to exit</div></div>
+        <div className="admin-logo"><div className="admin-logo-txt">管理パネル</div><div className="admin-logo-sub">Admin Panel</div></div>
         <nav className="admin-nav">
           <div className="admin-nav-group">
             <span className="admin-nav-label">設定</span>
             {sideItems.map(item=>(
               <button key={item.id} className={`admin-nav-item ${sec===item.id?"active":""}`}
-                onClick={()=>selectSec(item.id)}>
+                onClick={()=>{ setSec(item.id); setEditNid(null); setEditCh(null); }}>
                 {item.icon} {item.label}{item.badge>0&&<span className="badge">{item.badge}</span>}
               </button>
             ))}
@@ -1044,7 +1717,7 @@ function AdminPanel({store,onClose}){
           {editNid&&(
             <div className="admin-nav-group">
               <span className="admin-nav-label">編集中</span>
-              <button className={`admin-nav-item ${sec==="novel_edit"?"active":""}`} onClick={()=>{ setSec("novel_edit"); setMenuSelected(true); }}>
+              <button className={`admin-nav-item ${sec==="novel_edit"?"active":""}`} onClick={()=>setSec("novel_edit")}>
                 📝 {eNov?.title||"作品"}
               </button>
             </div>
@@ -1054,8 +1727,6 @@ function AdminPanel({store,onClose}){
       </div>
 
       <div className="admin-main">
-        {/* モバイル：コンテンツ画面上部に「← メニューへ」ボタン */}
-        <button className="mobile-back-btn" onClick={goBackToMenu}>← メニューへ</button>
 
         {sec==="site"&&(
           <div className="fadein">
@@ -1113,7 +1784,7 @@ function AdminPanel({store,onClose}){
                 </div>
               ))}
             </div>
-            <div style={{background:"color-mix(in srgb,var(--bg) 92%,#888 8%)",border:"1px solid var(--border-hi)",padding:20,borderRadius:2}}>
+            <div style={{background:"var(--surface)",border:"1px solid var(--border)",padding:20,borderRadius:2}}>
               <div className="form-row">
                 <div className="form-group" style={{marginBottom:12}}><label className="form-label">表示名</label><input className="form-input" value={newLL} onChange={e=>setNewLL(e.target.value)} placeholder="X (Twitter)"/></div>
                 <div className="form-group" style={{marginBottom:12}}><label className="form-label">URL</label><input className="form-input" value={newLU} onChange={e=>setNewLU(e.target.value)} placeholder="https://x.com/yourname"/></div>
@@ -1127,7 +1798,7 @@ function AdminPanel({store,onClose}){
         {sec==="hitorigoto"&&(
           <div className="fadein">
             <div className="admin-title">ひとりごと</div>
-            <div style={{background:"color-mix(in srgb,var(--bg) 92%,#888 8%)",border:"1px solid var(--border-hi)",padding:20,borderRadius:2,marginBottom:24}}>
+            <div style={{background:"var(--surface)",border:"1px solid var(--border)",padding:20,borderRadius:2,marginBottom:24}}>
               <div className="form-group" style={{marginBottom:12}}><label className="form-label">新しい投稿</label>
                 <textarea className="form-textarea" value={newMurmur} onChange={e=>setNewMurmur(e.target.value)} rows={4} placeholder="ふと思ったこと、執筆の近況など…"/>
               </div>
@@ -1146,18 +1817,22 @@ function AdminPanel({store,onClose}){
                   ))}
                 </div>
               )}
-              <button className="btn btn-primary" disabled={saving||(!newMurmur.trim()&&newFiles.length===0)} onClick={async()=>{
-                setMurmurErr("");
-                await flash(async ()=>{
-                  try{ await addMurmur(newMurmur.trim(),newFiles); setNewMurmur(""); setNewFiles([]); }
-                  catch(e){ setMurmurErr(e.message||"エラーが発生しました"); }
-                });
-              }}>投稿する</button>
+              <button className="btn btn-primary" disabled={saving||(!newMurmur.trim()&&newFiles.length===0)} onClick={async()=>{ await flash(()=>addMurmur(newMurmur.trim(),newFiles)); setNewMurmur(""); setNewFiles([]); }}>投稿する</button>
               {saving&&<span style={{marginLeft:12,fontSize:12,color:"var(--txt3)"}}>⌛ アップロード中…</span>}
-              {murmurErr&&<div style={{marginTop:8,fontSize:12,color:"#ef4444"}}>⚠ {murmurErr}</div>}
               {!saving&&saved&&<span style={{marginLeft:12,fontSize:12,color:"var(--accent)"}}>✓ 投稿しました</span>}
             </div>
-            <MurmurEditList murmurs={author.murmurs||[]} onUpdate={updateMurmur} onDelete={deleteMurmur}/>
+            <div className="msg-list">
+              {(author.murmurs||[]).length===0&&<div style={{padding:"16px",color:"var(--txt3)",fontSize:13}}>まだ投稿がありません</div>}
+              {(author.murmurs||[]).map(m=>(
+                <div key={m.id} className="msg-row" style={{cursor:"default"}}>
+                  <div className="msg-body">{m.text}</div>
+                  {(m.files||[]).length>0&&<div style={{display:"flex",gap:6,marginTop:8}}>
+                    {(m.files||[]).map((f,i)=>f.type==="image"?<img key={i} src={f.data} alt="" style={{width:48,height:48,objectFit:"cover",border:"1px solid var(--border)",borderRadius:2}}/>:<span key={i} style={{fontSize:11,color:"var(--txt3)"}}>📎{f.name}</span>)}
+                  </div>}
+                  <div className="msg-acts"><span className="msg-date">{m.date}</span><button className="icon-btn danger" style={{marginLeft:"auto",fontSize:11}} onClick={()=>deleteMurmur(m.id)}>🗑 削除</button></div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -1211,52 +1886,20 @@ function AdminPanel({store,onClose}){
         {sec==="novels"&&(
           <div className="fadein">
             <div className="admin-title">作品管理</div>
-            <div style={{marginBottom:12,fontSize:12,color:"var(--txt3)"}}>↕ ボタンで表示順を変更できます（ピン固定は常に先頭）</div>
             <div className="alist">
               {novels.length===0&&<div style={{padding:"24px",color:"var(--txt3)",fontSize:13}}>作品がありません</div>}
-              {(()=>{
-                // order付きで並べる（orderがなければFirestore取得順）
-                const ordered=[...novels].sort((a,b)=>{
-                  const ao=a.order??9999, bo=b.order??9999;
-                  return ao-bo;
-                });
-                const moveNovel=(id,dir)=>{
-                  const idx=ordered.findIndex(n=>n.id===id);
-                  const target=idx+dir;
-                  if(target<0||target>=ordered.length) return;
-                  // swap order values
-                  const newOrdered=[...ordered];
-                  [newOrdered[idx],newOrdered[target]]=[newOrdered[target],newOrdered[idx]];
-                  newOrdered.forEach((n,i)=>updateNovel(n.id,{order:i}));
-                };
-                return ordered.map((n,idx)=>(
-                  <div key={n.id} className="arow">
-                    <div className="arow-top">
-                      <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
-                        <button className="icon-btn" style={{fontSize:10,padding:"1px 5px",lineHeight:1.4}} disabled={idx===0} onClick={()=>moveNovel(n.id,-1)}>▲</button>
-                        <button className="icon-btn" style={{fontSize:10,padding:"1px 5px",lineHeight:1.4}} disabled={idx===ordered.length-1} onClick={()=>moveNovel(n.id,1)}>▼</button>
-                      </div>
-                      <div className="arow-dot" style={{background:n.accent,boxShadow:`0 0 8px ${n.accent}66`,flexShrink:0}}/>
-                      <div className="arow-info">
-                        <div className="arow-title">
-                          {n.pinned&&<span style={{fontSize:11,marginRight:4}}>📌</span>}
-                          {n.locked&&<span style={{fontSize:11,marginRight:4}}>🔒</span>}
-                          {n.title}
-                        </div>
-                        <div className="arow-meta">{n.author} · {(n.chapters||[]).length}章 · {fmtCount(countChars(n))}</div>
-                      </div>
-                    </div>
-                    <div className="arow-actions">
-                      <button className={`icon-btn ${n.pinned?"primary":""}`} onClick={()=>updateNovel(n.id,{pinned:!n.pinned})}>{n.pinned?"📌":"📌"} {n.pinned?"固定解除":"固定"}</button>
-                      <button className={`icon-btn ${n.locked?"danger":""}`} onClick={()=>updateNovel(n.id,{locked:!n.locked})}>{n.locked?"🔒":"🔓"} {n.locked?"解除":"ロック"}</button>
-                      <button className="icon-btn primary" onClick={()=>{ setEditNid(n.id); setSec("novel_edit"); setMenuSelected(true); }}>✏️ 編集</button>
-                      <button className="icon-btn danger" disabled={!!n.locked} style={{opacity:n.locked?.3:1,cursor:n.locked?"not-allowed":"pointer"}} onClick={()=>!n.locked&&setDelConfirm({type:"novel",id:n.id,label:n.title})}>🗑</button>
-                    </div>
+              {novels.map(n=>(
+                <div key={n.id} className="arow">
+                  <div className="arow-dot" style={{background:n.accent,boxShadow:`0 0 8px ${n.accent}66`}}/>
+                  <div className="arow-info"><div className="arow-title">{n.title}</div><div className="arow-meta">{n.author} · {(n.chapters||[]).length}章 · {n.genre}</div></div>
+                  <div className="arow-actions">
+                    <button className="icon-btn primary" onClick={()=>{ setEditNid(n.id); setSec("novel_edit"); }}>✏️ 編集</button>
+                    <button className="icon-btn danger" onClick={()=>setDelConfirm({type:"novel",id:n.id,label:n.title})}>🗑</button>
                   </div>
-                ));
-              })()}
+                </div>
+              ))}
             </div>
-            <button className="btn btn-primary" onClick={async()=>{ const id=await addNovel(); setEditNid(id); setSec("novel_edit"); setMenuSelected(true); }}>＋ 新しい作品を追加</button>
+            <button className="btn btn-primary" onClick={()=>{ const id=addNovel(); setEditNid(id); setSec("novel_edit"); }}>＋ 新しい作品を追加</button>
           </div>
         )}
 
@@ -1266,34 +1909,7 @@ function AdminPanel({store,onClose}){
               <button className="back-link" onClick={()=>setSec("novels")}>← 作品一覧</button>
               <div className="admin-title" style={{margin:0}}>{eNov.title}</div>
             </div>
-            <div style={{background:"color-mix(in srgb,var(--bg) 92%,#888 8%)",border:"1px solid var(--border-hi)",borderRadius:3,padding:"4px 16px",marginBottom:24}}>
-              <div className="toggle-row">
-                <div><div className="toggle-label">📌 先頭に固定</div><div className="toggle-desc">作品一覧の最上部に表示されます</div></div>
-                <label className="toggle-switch"><input type="checkbox" checked={!!eNov.pinned} onChange={e=>updateNovel(eNov.id,{pinned:e.target.checked})}/><span className="toggle-slider"/></label>
-              </div>
-              <div className="toggle-row">
-                <div><div className="toggle-label">🔒 削除ロック</div><div className="toggle-desc">ONにすると削除ボタンが無効になります</div></div>
-                <label className="toggle-switch"><input type="checkbox" checked={!!eNov.locked} onChange={e=>updateNovel(eNov.id,{locked:e.target.checked})}/><span className="toggle-slider"/></label>
-              </div>
-              <div className="toggle-row" style={{borderBottom:"none"}}>
-                <div><div className="toggle-label">↵ 文頭一字空け</div><div className="toggle-desc">段落の先頭に全角スペースを自動挿入</div></div>
-                <label className="toggle-switch"><input type="checkbox" checked={eNov.indent!==false} onChange={e=>updateNovel(eNov.id,{indent:e.target.checked})}/><span className="toggle-slider"/></label>
-              </div>
-            </div>
-            <div style={{background:"color-mix(in srgb,var(--bg) 92%,#888 8%)",border:"1px solid rgba(255,255,255,.1)",borderRadius:3,padding:"10px 16px",marginBottom:24,display:"flex",alignItems:"center",gap:10}}>
-              <span style={{fontSize:11,color:"var(--txt2)",letterSpacing:".14em"}}>📝 実文字数（本文から自動計算）</span>
-              <span style={{fontFamily:"var(--serif)",fontSize:22,color:"var(--accent)",marginLeft:"auto"}}>{fmtCount(countChars(eNov))}</span>
-              <span style={{fontSize:11,color:"var(--txt2)"}}>/ {(eNov.chapters||[]).length}章</span>
-            </div>
-            {/* カバープレビュー */}
-            <div className="gradient-preview" style={{background:`linear-gradient(160deg,${eNov.color1},${eNov.color2})`}}>
-              <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.55) 0%,transparent 60%)"}}/>
-              <div className="gp-dot" style={{background:eNov.accent,color:eNov.accent}}/>
-              <div style={{position:"absolute",bottom:16,left:20,right:20}}>
-                <div style={{fontFamily:"var(--serif)",fontSize:20,fontWeight:300,color:"#e8e4de",letterSpacing:".06em",textShadow:"0 1px 6px rgba(0,0,0,.7)",lineHeight:1.25,marginBottom:3}}>{eNov.title||"タイトル"}</div>
-                {eNov.subtitle&&<div style={{fontSize:11,color:"rgba(232,228,222,.65)",letterSpacing:".08em",fontStyle:"italic"}}>{eNov.subtitle}</div>}
-              </div>
-            </div>
+            <div className="gradient-preview" style={{background:`linear-gradient(160deg,${eNov.color1},${eNov.color2})`}}/>
             <div className="form-row">
               <ColorPicker label="カバー色①" value={eNov.color1} onChange={v=>updateNovel(eNov.id,{color1:v})}/>
               <ColorPicker label="カバー色②" value={eNov.color2} onChange={v=>updateNovel(eNov.id,{color2:v})}/>
@@ -1316,7 +1932,7 @@ function AdminPanel({store,onClose}){
             <div style={{marginTop:32,paddingTop:24,borderTop:"1px solid var(--border)"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
                 <span className="form-label" style={{margin:0}}>章一覧 ({(eNov.chapters||[]).length}章)</span>
-                <button className="btn btn-primary" style={{padding:"7px 16px",fontSize:11}} onClick={async()=>{ const id=await addChapter(eNov.id); setEditCh({nid:eNov.id,cid:id}); setSec("chapter_edit"); setMenuSelected(true); }}>＋ 章を追加</button>
+                <button className="btn btn-primary" style={{padding:"7px 16px",fontSize:11}} onClick={()=>{ const id=addChapter(eNov.id); setEditCh({nid:eNov.id,cid:id}); setSec("chapter_edit"); }}>＋ 章を追加</button>
               </div>
               <div className="ch-list">
                 {(eNov.chapters||[]).length===0&&<div style={{padding:"16px",color:"var(--txt3)",fontSize:12}}>章がありません</div>}
@@ -1324,7 +1940,7 @@ function AdminPanel({store,onClose}){
                   <div key={ch.id} className="ch-row">
                     <span className="ch-num">0{i+1}</span><span className="ch-txt">{ch.title}</span>
                     <div style={{display:"flex",gap:6,marginLeft:"auto"}}>
-                      <button className="icon-btn primary" onClick={()=>{ setEditCh({nid:eNov.id,cid:ch.id}); setSec("chapter_edit"); setMenuSelected(true); }}>✏️</button>
+                      <button className="icon-btn primary" onClick={()=>{ setEditCh({nid:eNov.id,cid:ch.id}); setSec("chapter_edit"); }}>✏️</button>
                       <button className="icon-btn danger" onClick={()=>setDelConfirm({type:"chapter",nid:eNov.id,id:ch.id,label:ch.title})}>🗑</button>
                     </div>
                   </div>
@@ -1334,7 +1950,7 @@ function AdminPanel({store,onClose}){
             <div style={{display:"flex",gap:10,marginTop:24}}>
               <button className="btn btn-primary" onClick={()=>flash()}>保存する</button>
               {saved&&<span style={{lineHeight:"38px",fontSize:12,color:"var(--accent)"}}>✓ 保存しました</span>}
-              <button className="btn btn-danger" style={{marginLeft:"auto",opacity:eNov.locked?.3:1,cursor:eNov.locked?"not-allowed":"pointer"}} disabled={!!eNov.locked} onClick={()=>!eNov.locked&&setDelConfirm({type:"novel",id:eNov.id,label:eNov.title})}>{eNov.locked?"🔒 ロック中（削除不可）":"この作品を削除"}</button>
+              <button className="btn btn-danger" style={{marginLeft:"auto"}} onClick={()=>setDelConfirm({type:"novel",id:eNov.id,label:eNov.title})}>この作品を削除</button>
             </div>
           </div>
         )}
@@ -1365,7 +1981,35 @@ function AdminPanel({store,onClose}){
         })()}
       </div>
 
-      <div className="save-bar"><div className="save-status" style={{color:"var(--txt2)"}}>{saving?"⌛ 保存中…":saved?"✓ 変更を保存しました":"データはFirestoreに自動保存されます"}</div></div>
+        {/* ── ギャラリー管理：名言・名文 ── */}
+        {sec==="gallery_quotes"&&(
+          <div className="fadein">
+            <div className="admin-title">名言・名文の管理</div>
+            <p style={{color:"var(--txt3)",fontSize:12,marginBottom:24,lineHeight:1.9}}>
+              作品を精読した上で選出した名言・名文を登録してください。<br/>
+              ギャラリーではランダムに表示されます。
+            </p>
+            <GalleryQuoteForm novels={novels} gallery={gallery} setGallery={setGallery} flash={flash} saved={saved}/>
+          </div>
+        )}
+
+        {/* ── ギャラリー管理：キャラクター ── */}
+        {sec==="gallery_chars"&&(
+          <div className="fadein">
+            <div className="admin-title">キャラクター管理</div>
+            <GalleryCharForm novels={novels} gallery={gallery} setGallery={setGallery} flash={flash} saved={saved}/>
+          </div>
+        )}
+
+        {/* ── ギャラリー管理：主題・モチーフ ── */}
+        {sec==="gallery_themes"&&(
+          <div className="fadein">
+            <div className="admin-title">主題・モチーフ管理</div>
+            <GalleryThemeForm novels={novels} gallery={gallery} setGallery={setGallery} flash={flash} saved={saved}/>
+          </div>
+        )}
+
+      <div className="save-bar"><div className="save-status">{saving?"⌛ 保存中…":saved?"✓ 変更を保存しました":"データはFirestoreに自動保存されます"}</div></div>
 
       {delConfirm&&(
         <div className="modal-bg">
@@ -1375,7 +2019,7 @@ function AdminPanel({store,onClose}){
             <div className="modal-actions">
               <button className="btn" onClick={()=>setDelConfirm(null)}>キャンセル</button>
               <button className="btn btn-danger" onClick={()=>{
-                if(delConfirm.type==="novel"){ deleteNovel(delConfirm.id); setSec("novels"); setEditNid(null); setMenuSelected(true); }
+                if(delConfirm.type==="novel"){ deleteNovel(delConfirm.id); setSec("novels"); setEditNid(null); }
                 if(delConfirm.type==="chapter"){ deleteChapter(delConfirm.nid,delConfirm.id); setSec("novel_edit"); }
                 setDelConfirm(null);
               }}>削除する</button>
@@ -1388,218 +2032,17 @@ function AdminPanel({store,onClose}){
 }
 
 // ═══════════════ ROOT ═══════════════
-// ═══════════════ BG TEXT LAYER ═══════════════
-function BgTextLayer({novels}){
-  const [cols, setCols] = React.useState([]);
-  const poolRef = React.useRef([]);    // 未使用フレーズのキュー
-  const usedRef = React.useRef([]);    // 使用済みフレーズ
-  const colTimersRef = React.useRef({}); // 列ごとのタイマー
-
-  // 全文プールを抽出してpoolRefに格納
-  const buildPool = React.useCallback((nvls)=>{
-    const sentences = [];
-    nvls.forEach(n=>{
-      (n.chapters||[]).forEach(ch=>{
-        const txt = (ch.content||"").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
-        // セリフ抽出
-        const dialogRe = /[「『]((?:[^「『」』]|(?:[「『][^「『」』]*[」』]))*)[」』]/g;
-        let m;
-        while((m=dialogRe.exec(txt))!==null){
-          const s=m[0].trim(); if(s.length>=6) sentences.push(s);
-        }
-        // 地の文（句点単位）
-        const masked=txt.replace(/[「『]((?:[^「『」』]|(?:[「『][^「『」』]*[」』]))*)[」』]/g,s=>"　".repeat(s.length));
-        masked.split(/(?<=。)/).forEach((_,i,arr)=>{
-          let pos=0; for(let j=0;j<i;j++) pos+=arr[j].length;
-          const s=txt.slice(pos,pos+arr[i].length).trim();
-          const clean=s.replace(/[「『][^」』]*[」』]/g,"").trim();
-          if(clean.length>=10 && !/^[「『]/.test(s)) sentences.push(s);
-        });
-      });
-    });
-    // シャッフルしてpoolに
-    poolRef.current=[...sentences].sort(()=>Math.random()-.5);
-    usedRef.current=[];
-  },[]);
-
-  // プールから次のフレーズを取得（尽きたら使用済みをシャッフルして再投入）
-  const nextPhrase = React.useCallback(()=>{
-    if(poolRef.current.length===0){
-      if(usedRef.current.length===0) return null;
-      poolRef.current=[...usedRef.current].sort(()=>Math.random()-.5);
-      usedRef.current=[];
-    }
-    const phrase=poolRef.current.shift();
-    usedRef.current.push(phrase);
-    const toV=s=>s.replace(/…/g,"︙").replace(/‥/g,"︰");
-    return toV(phrase);
-  },[]);
-
-  // 列の初期化
-  React.useEffect(()=>{
-    if(!novels||novels.length===0) return;
-    buildPool(novels);
-
-    const SLOT_W=46, W=window.innerWidth;
-    const maxSlots=Math.floor(W/SLOT_W);
-    const slots=Array.from({length:maxSlots},(_,i)=>i).sort(()=>Math.random()-.5);
-
-    const initial=slots.map((slot,i)=>{
-      const dur=44+Math.random()*26;
-      return {
-        slot, key:i,
-        text: nextPhrase()||"",
-        left: slot*SLOT_W+8,
-        goUp: Math.random()>.5,
-        dur,
-        delay: -(Math.random()*70),
-        opacity: 0.042+Math.random()*0.028,
-      };
-    });
-    setCols(initial);
-
-    // 各列のアニメ終了タイミングで次のフレーズに差し替え
-    initial.forEach(col=>{
-      const schedule=()=>{
-        // delay補正後の残り時間
-        const remaining = col.dur*1000 - Math.abs(col.delay)*1000;
-        const wait = remaining > 0 ? remaining : col.dur*1000;
-        const timer=setTimeout(()=>{
-          const phrase=nextPhrase();
-          if(!phrase) return;
-          setCols(prev=>prev.map(c=>
-            c.key===col.key
-              ? {...c, text:phrase, delay:0, goUp:Math.random()>.5, dur:44+Math.random()*26, opacity:0.042+Math.random()*0.028, key:c.key}
-              : c
-          ));
-          // 次のサイクルをスケジュール
-          colTimersRef.current[col.key]=setTimeout(function loop(){
-            const p2=nextPhrase(); if(!p2) return;
-            setCols(prev=>prev.map(c=>
-              c.key===col.key
-                ? {...c, text:p2, delay:0, goUp:Math.random()>.5, dur:44+Math.random()*26, opacity:0.042+Math.random()*0.028}
-                : c
-            ));
-            colTimersRef.current[col.key]=setTimeout(loop,(44+Math.random()*26)*1000);
-          },(44+Math.random()*26)*1000);
-        },wait);
-        colTimersRef.current[col.key]=timer;
-      };
-      schedule();
-    });
-
-    return ()=>{ Object.values(colTimersRef.current).forEach(clearTimeout); };
-  },[novels.map(n=>n.id).join(",")]);
-
-  if(cols.length===0) return null;
-  return(
-    <div className="bg-text-layer" aria-hidden="true">
-      {cols.map(col=>(
-        <div key={col.key}
-          style={{
-            position:"absolute",
-            left:col.left,
-            top:0,
-            opacity:col.opacity,
-            fontSize:"12px",
-            color:"var(--txt)",
-            writingMode:"vertical-rl",
-            textOrientation:"mixed",
-            fontFamily:"var(--serif)",
-            letterSpacing:".06em",
-            lineHeight:"1.8em",
-            whiteSpace:"nowrap",
-            animation:`${col.goUp?"driftUp":"driftDown"} ${col.dur}s ${col.delay}s linear infinite`,
-          }}>
-          {col.text}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function App(){
   const store=useStore();
-  const {site,author,novels,addMessage,loading,dbError}=store;
+  const {site,author,novels,gallery,addMessage,loading,dbError}=store;
   const [page,setPage]=useState("home");
   const [novel,setNovel]=useState(null);
   const [chapterId,setChapterId]=useState(null);
   const [adminOpen,setAdminOpen]=useState(false);
   const [showLogin,setShowLogin]=useState(false);
   const [authed,setAuthed]=useState(false);
-  const [lightMode,setLightMode]=useState(false);
 
-  const [transiting,setTransiting]=useState(false);
-  const [visPage,setVisPage]=useState("home");
-
-  const TRANSITIONS=[
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0;clip-path:circle(0% at 50% 50%)";ov.style.transition="opacity 1s cubic-bezier(.4,0,.2,1),clip-path 1s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1";ov.style.clipPath="circle(120% at 50% 50%)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0;clip-path:circle(0% at 0% 0%)";ov.style.transition="opacity 1s cubic-bezier(.4,0,.2,1),clip-path 1s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1";ov.style.clipPath="circle(150% at 0% 0%)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0;clip-path:circle(0% at 100% 100%)";ov.style.transition="opacity 1s cubic-bezier(.4,0,.2,1),clip-path 1s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1";ov.style.clipPath="circle(150% at 100% 100%)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);transform:translateX(-100%)";ov.style.transition="transform .9s cubic-bezier(.77,0,.18,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.transform="translateX(0)"}));setTimeout(done,950);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);transform:translateX(100%)";ov.style.transition="transform .9s cubic-bezier(.77,0,.18,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.transform="translateX(0)"}));setTimeout(done,950);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);transform:translateY(-100%)";ov.style.transition="transform .9s cubic-bezier(.77,0,.18,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.transform="translateY(0)"}));setTimeout(done,950);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);transform:translateY(100%)";ov.style.transition="transform .9s cubic-bezier(.77,0,.18,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.transform="translateY(0)"}));setTimeout(done,950);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0";ov.style.transition="opacity 1s ease";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:polygon(50% 50%,50% 50%,50% 50%,50% 50%)";ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="polygon(50% -50%,150% 50%,50% 150%,-50% 50%)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:inset(0 50% 0 50%)";ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="inset(0 0% 0 0%)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:inset(50% 0 50% 0)";ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="inset(0% 0 0% 0)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0;transform:scale(.88)";ov.style.transition="opacity .85s ease,transform .85s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1";ov.style.transform="scale(1)"}));setTimeout(done,900);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0;transform:scale(1.12)";ov.style.transition="opacity .85s ease,transform .85s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1";ov.style.transform="scale(1)"}));setTimeout(done,900);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:polygon(-10% -10%,-10% -10%,0% 0%,0% 0%)";ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="polygon(-10% -10%,110% -10%,110% 110%,-10% 110%)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:polygon(110% -10%,110% -10%,100% 0%,100% 0%)";ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="polygon(110% -10%,110% 110%,-10% 110%,-10% -10%)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:inset(100% 0 0 0)";ov.style.transition="clip-path 1s cubic-bezier(.77,0,.18,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="inset(0% 0 0 0)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:inset(0 0 100% 0)";ov.style.transition="clip-path 1s cubic-bezier(.77,0,.18,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="inset(0 0 0% 0)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--accent);opacity:0";ov.style.transition="opacity .18s ease";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1"}));setTimeout(()=>{ov.style.background="var(--bg)";ov.style.transition="background .6s ease,opacity .6s ease";},200);setTimeout(done,900);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:polygon(49% 49%,51% 49%,51% 51%,49% 51%)";ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="polygon(0% 0%,100% 0%,100% 100%,0% 100%)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:inset(0 0 0 100%)";ov.style.transition="clip-path 1s cubic-bezier(.77,0,.18,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="inset(0 0 0 0%)"}));setTimeout(done,1050);},
-  ];
-  const OUTRO=[
-    ov=>{ov.style.transition="opacity .7s cubic-bezier(.4,0,.6,1),clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.opacity="0";ov.style.clipPath="circle(0% at 50% 50%)"},
-    ov=>{ov.style.transition="opacity .7s ease,clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.opacity="0";ov.style.clipPath="circle(0% at 0% 0%)"},
-    ov=>{ov.style.transition="opacity .7s ease,clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.opacity="0";ov.style.clipPath="circle(0% at 100% 100%)"},
-    ov=>{ov.style.transition="transform .8s cubic-bezier(.77,0,.18,1)";ov.style.transform="translateX(100%)"},
-    ov=>{ov.style.transition="transform .8s cubic-bezier(.77,0,.18,1)";ov.style.transform="translateX(-100%)"},
-    ov=>{ov.style.transition="transform .8s cubic-bezier(.77,0,.18,1)";ov.style.transform="translateY(100%)"},
-    ov=>{ov.style.transition="transform .8s cubic-bezier(.77,0,.18,1)";ov.style.transform="translateY(-100%)"},
-    ov=>{ov.style.transition="opacity .7s ease";ov.style.opacity="0"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="polygon(50% 50%,50% 50%,50% 50%,50% 50%)"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="inset(0 50% 0 50%)"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="inset(50% 0 50% 0)"},
-    ov=>{ov.style.transition="opacity .7s ease,transform .7s ease";ov.style.opacity="0";ov.style.transform="scale(1.08)"},
-    ov=>{ov.style.transition="opacity .7s ease,transform .7s ease";ov.style.opacity="0";ov.style.transform="scale(.94)"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="polygon(110% 110%,110% 110%,100% 100%,100% 100%)"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="polygon(-10% 110%,-10% 110%,0% 100%,0% 100%)"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="inset(100% 0 0 0)"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="inset(0 0 100% 0)"},
-    ov=>{ov.style.transition="opacity .6s ease";ov.style.opacity="0"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="polygon(49% 49%,51% 49%,51% 51%,49% 51%)"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="inset(0 100% 0 0)"},
-  ];
-
-  const nav=dest=>{
-    if(transiting||dest===visPage) return;
-    setTransiting(true);
-    let idx;
-    if(dest==="detail"&&novel){
-      const ni=(novels||[]).findIndex(n=>n.id===novel.id);
-      idx=ni>=0?ni%TRANSITIONS.length:0;
-    } else {
-      idx=Math.floor(Math.random()*TRANSITIONS.length);
-    }
-    const ov=document.createElement("div");
-    document.body.appendChild(ov);
-    TRANSITIONS[idx](ov,()=>{
-      window.scrollTo({top:0,behavior:'instant'});
-      document.documentElement.scrollTop=0;
-      setPage(dest);
-      setVisPage(dest);
-      setTimeout(()=>{
-        OUTRO[idx](ov);
-        setTimeout(()=>{ ov.remove(); setTransiting(false); },850);
-      },40);
-    });
-  };
+  const nav=p=>{ setPage(p); window.scrollTo({top:0,behavior:"smooth"}); };
   const openNovel=n=>{ setNovel(n); nav("detail"); };
   const openChapter=id=>{ setChapterId(id); nav("reading"); };
   const liveNovel=novel?novels.find(n=>n.id===novel.id)||novel:null;
@@ -1608,6 +2051,7 @@ function App(){
   useEffect(()=>{
     const base=site.name||"文藻";
     if(page==="home") document.title=base;
+    else if(page==="gallery") document.title=`ギャラリー — ${base}`;
     else if(page==="hitorigoto") document.title=`ひとりごと — ${base}`;
     else if(page==="profile") document.title=`著者プロフィール — ${base}`;
     else if(page==="detail"&&liveNovel) document.title=`${liveNovel.title} — ${base}`;
@@ -1642,9 +2086,8 @@ function App(){
 
   return(
     <>
-      <Styles site={site} lightMode={lightMode}/>
+      <Styles site={site}/>
       <div className="app">
-        <BgTextLayer novels={novels}/>
         {loading&&(
           <div style={{position:"fixed",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"var(--bg)",zIndex:9000,gap:20}}>
             <div style={{fontFamily:"var(--serif)",fontSize:32,color:"var(--accent)",letterSpacing:"0.12em"}}>{site.name||"文藻"}</div>
@@ -1670,9 +2113,10 @@ function App(){
           </div>
         )}
         {!loading&&!dbError&&!adminOpen&&page!=="reading"&&(
-          <Nav page={page} onNav={nav} site={site} onLogoClick={handleLogoClick} lightMode={lightMode} onToggleLight={()=>setLightMode(m=>!m)}/>
+          <Nav page={page} onNav={nav} site={site} onLogoClick={handleLogoClick}/>
         )}
         {!loading&&!dbError&&!adminOpen&&page==="home"&&<HomePage site={site} novels={novels} onOpen={openNovel}/>}
+        {!loading&&!dbError&&!adminOpen&&page==="gallery"&&<GalleryPage gallery={gallery} novels={novels} site={site}/>}
         {!loading&&!dbError&&!adminOpen&&page==="hitorigoto"&&<HitorigotoPage author={author}/>}
         {!loading&&!dbError&&!adminOpen&&page==="detail"&&liveNovel&&<DetailPage novel={liveNovel} onBack={()=>nav("home")} onRead={openChapter} onSendMessage={addMessage}/>}
         {!loading&&!dbError&&!adminOpen&&page==="reading"&&liveNovel&&chapterId&&<ReadingPage novel={liveNovel} chapterId={chapterId} onBack={()=>nav("detail")} onChapter={setChapterId}/>}
