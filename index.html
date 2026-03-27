@@ -384,12 +384,12 @@ function Styles({site, lightMode}){
     .toc-text{font-size:14px;color:var(--txt);transition:color .2s;letter-spacing:.04em}
     .toc-arrow{margin-left:auto;font-size:15px;color:var(--txt3);transition:transform .2s,color .2s}.toc-item:hover .toc-arrow{transform:translateX(5px);color:var(--accent)}
     /* READING */
-    .reading-nav{position:fixed;top:0;left:0;right:0;z-index:500;height:54px;padding:0 36px;display:flex;align-items:center;gap:14px;background:var(--nav-bg);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+    .reading-nav{position:fixed;top:0;left:0;right:0;z-index:500;height:54px;padding:0 36px;display:flex;align-items:center;gap:14px;background:rgba(7,7,15,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
     .reading-back{background:none;border:none;cursor:pointer;color:var(--txt3);font-size:15px;padding:4px;transition:color .2s}.reading-back:hover{color:var(--accent)}
     .reading-crumb{font-size:11px;color:var(--txt3);letter-spacing:.1em}.reading-crumb b{color:var(--txt2);font-weight:400}
     .progress-rail{position:fixed;top:54px;left:0;right:0;height:2px;background:var(--border);z-index:500}.progress-fill{height:100%;background:var(--accent);transition:width .1s}
     /* ── カクヨム風 本文エリア ── */
-    .reading-wrap{background:var(--bg);min-height:100vh}
+    .reading-wrap{background:color-mix(in srgb,var(--bg) 55%,#1a1a1a 45%);min-height:100vh}
     .reading-content{max-width:820px;margin:0 auto;padding:88px 40px 60px}
     .reading-eyebrow{font-size:9px;letter-spacing:.44em;color:var(--accent);text-transform:uppercase;margin-bottom:20px;text-align:center}
     .reading-ch-title{font-family:'Noto Serif JP',serif;font-size:clamp(18px,3.5vw,24px);font-weight:500;color:var(--txt);line-height:1.9;margin-bottom:56px;padding-bottom:28px;border-bottom:1px solid var(--border);text-align:center;letter-spacing:.2em}
