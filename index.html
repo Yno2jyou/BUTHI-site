@@ -12,9 +12,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
-// ═══════════════════════════════════════════════════════
-// 🔥 Firebase 設定 — Firebaseコンソールの値に書き換えてください
-// ═══════════════════════════════════════════════════════
 const FIREBASE_CONFIG = {
   apiKey:            "AIzaSyBYEPxGXwZW2JLLlHM7a9Ja_UNHZtv-Nug",
   authDomain:        "buthi0809.firebaseapp.com",
@@ -69,12 +66,13 @@ const DEFAULT_NOVELS = [
 
 const ADMIN_PASSWORD = "abbcccddddeeeee";
 
+// ═══════════════ GALLERY QUOTES CACHE KEY ═══════════════
+// Firestoreのgallery/{novelId}ドキュメントに名言を保存
+// 構造: { quotes: [{text, chapter}], generatedAt, novelId }
+
 // ═══════════════ FIREBASE HELPERS ═══════════════
-// ファイル（画像など）をFirebase Storageにアップロードし、URLを返す
-// base64データURIかどうかを判定
 const isDataUri = s => typeof s === "string" && s.startsWith("data:");
 
-// 画像をCanvas経由でリサイズ・圧縮してbase64を返す（Firestore直接保存用）
 async function compressImage(dataUri, maxPx=800, quality=0.72) {
   return new Promise((resolve)=>{
     const img = new Image();
@@ -92,7 +90,6 @@ async function compressImage(dataUri, maxPx=800, quality=0.72) {
   });
 }
 
-// ひとりごとのファイルを圧縮してbase64のまま返す（Storage不使用）
 async function uploadMurmurFiles(murmurId, files) {
   return await Promise.all((files||[]).map(async (f) => {
     if (f.type==="image" && isDataUri(f.data)) {
@@ -103,10 +100,59 @@ async function uploadMurmurFiles(murmurId, files) {
   }));
 }
 
-// 著者アイコンを圧縮してbase64のまま返す（Storage不使用）
 async function uploadAuthorIcon(dataUri) {
   if (!isDataUri(dataUri)) return dataUri;
   return await compressImage(dataUri, 400, 0.80);
+}
+
+// ═══════════════ AI QUOTE GENERATION ═══════════════
+async function generateQuotesForNovel(novel) {
+  // 全章の本文を結合
+  const fullText = (novel.chapters||[]).map(ch =>
+    `【${ch.title}】\n${ch.content}`
+  ).join("\n\n");
+
+  if (!fullText.trim() || fullText.length < 50) {
+    return [];
+  }
+
+  const prompt = `以下は「${novel.title}」（${novel.genre}）という小説の本文です。
+
+${fullText}
+
+この作品を精読し、文学的・詩的に特に優れた名言・名文を10個厳選してください。
+選出基準：
+- 作品のテーマや世界観を体現している文章
+- 単独で読んでも深い余韻を持つ文章
+- 著者の文体の特徴が最もよく表れている文章
+- 読者の心に刺さる、記憶に残る表現
+
+必ずJSON形式のみで返してください（前置き・説明・Markdownコードブロック不要）:
+{"quotes":[{"text":"名言・名文の文章","chapter":"出典章タイトル"},{"text":"...","chapter":"..."},...]}
+
+本文から正確に引用し、10個必ず選んでください。`;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      messages: [{ role: "user", content: prompt }]
+    })
+  });
+
+  const data = await response.json();
+  const text = (data.content||[]).map(i=>i.text||"").join("");
+  const clean = text.replace(/```json|```/g,"").trim();
+
+  try {
+    const parsed = JSON.parse(clean);
+    return parsed.quotes || [];
+  } catch(e) {
+    // JSONパース失敗時は空
+    return [];
+  }
 }
 
 // ═══════════════ FIRESTORE STORE ═══════════════
@@ -115,55 +161,56 @@ function useStore() {
   const [author,  setAuthorLocal] = useState(DEFAULT_AUTHOR);
   const [novels,  setNovelsLocal] = useState([]);
   const [messages,setMsgLocal]    = useState([]);
+  const [gallery, setGalleryLocal]= useState({}); // {novelId: {quotes:[...], generatedAt}}
   const [loading, setLoading]     = useState(true);
   const [dbError, setDbError]     = useState(null);
 
-  // ── リアルタイムリスナーで全データを購読 ──
   useEffect(() => {
     const unsubs = [];
     let resolved = 0;
-    const check = () => { resolved++; if(resolved >= 4) setLoading(false); };
+    const check = () => { resolved++; if(resolved >= 5) setLoading(false); };
 
-    // settings/site
     unsubs.push(db.collection("settings").doc("site").onSnapshot(snap => {
       if (snap.exists) setSiteLocal(snap.data()); else setSiteLocal(DEFAULT_SITE);
       check();
     }, e => { setDbError(e.message); check(); }));
 
-    // settings/author
     unsubs.push(db.collection("settings").doc("author").onSnapshot(snap => {
       if (snap.exists) setAuthorLocal(snap.data()); else setAuthorLocal(DEFAULT_AUTHOR);
       check();
     }, e => { setDbError(e.message); check(); }));
 
-    // novels — ordered by createdAt
     unsubs.push(db.collection("novels").orderBy("createdAt","asc").onSnapshot(snap => {
       setNovelsLocal(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       check();
     }, e => { setDbError(e.message); check(); }));
 
-    // messages — ordered by createdAt desc
     unsubs.push(db.collection("messages").orderBy("createdAt","desc").onSnapshot(snap => {
       setMsgLocal(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      check();
+    }, e => { setDbError(e.message); check(); }));
+
+    // gallery コレクション
+    unsubs.push(db.collection("gallery").onSnapshot(snap => {
+      const g = {};
+      snap.docs.forEach(d => { g[d.id] = d.data(); });
+      setGalleryLocal(g);
       check();
     }, e => { setDbError(e.message); check(); }));
 
     return () => unsubs.forEach(u => u());
   }, []);
 
-  const uid = () => db.collection("_").doc().id; // Firestore自動ID
+  const uid = () => db.collection("_").doc().id;
 
-  // ── サイト設定 ──
   const setSite = useCallback(async v => {
     const next = typeof v === "function" ? v(site) : v;
     setSiteLocal(next);
     try { await db.collection("settings").doc("site").set(next); } catch(e) { console.error(e); }
   }, [site]);
 
-  // ── 著者 ──
   const setAuthor = useCallback(async v => {
     const next = typeof v === "function" ? v(author) : v;
-    // アイコンがbase64ならStorageへ先にアップロード
     let toSave = next;
     if (isDataUri(next.icon)) {
       try {
@@ -177,7 +224,6 @@ function useStore() {
     try { await db.collection("settings").doc("author").set(toSave); } catch(e) { console.error(e); }
   }, [author]);
 
-  // ── 作品 ──
   const addNovel = async () => {
     const now = firebase.firestore.FieldValue.serverTimestamp();
     const data = {
@@ -190,15 +236,18 @@ function useStore() {
     return ref.id;
   };
   const updateNovel = async (id, patch) => {
-    setNovelsLocal(a => a.map(n => n.id===id ? {...n,...patch} : n)); // 楽観的更新
+    setNovelsLocal(a => a.map(n => n.id===id ? {...n,...patch} : n));
     try { await db.collection("novels").doc(id).update(patch); } catch(e) { console.error(e); }
   };
   const deleteNovel = async id => {
     setNovelsLocal(a => a.filter(n => n.id!==id));
-    try { await db.collection("novels").doc(id).delete(); } catch(e) { console.error(e); }
+    try {
+      await db.collection("novels").doc(id).delete();
+      // ギャラリーも削除
+      await db.collection("gallery").doc(id).delete();
+    } catch(e) { console.error(e); }
   };
 
-  // ── 章（小説ドキュメント内のchapters配列で管理） ──
   const addChapter = async nid => {
     const cid = uid();
     const ch = { id: cid, title:"新しい章", content:"" };
@@ -221,7 +270,6 @@ function useStore() {
     try { await db.collection("novels").doc(nid).update({ chapters: updated }); } catch(e) { console.error(e); }
   };
 
-  // ── メッセージ ──
   const addMessage = async m => {
     const data = { ...m, date: new Date().toLocaleString("ja-JP"), read: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp() };
@@ -236,11 +284,9 @@ function useStore() {
     try { await db.collection("messages").doc(id).update({ read: true }); } catch(e) { console.error(e); }
   };
 
-  // ── ひとりごと（author.murmurs配列で管理） ──
   const addMurmur = async (text, files) => {
     const mid = uid();
     const now = new Date();
-    // ファイルをStorageへアップロード
     let uploadedFiles = [];
     try { uploadedFiles = await uploadMurmurFiles(mid, files||[]); }
     catch(e) { console.error(e); uploadedFiles = files||[]; }
@@ -260,10 +306,36 @@ function useStore() {
     try { await db.collection("settings").doc("author").update({ murmurs: nextMurmurs }); } catch(e) { console.error(e); }
   };
 
-  return { site, setSite, author, setAuthor, novels, messages, loading, dbError,
+  // ギャラリー：名言をFirestoreに保存
+  const saveGalleryQuotes = async (novelId, quotes) => {
+    const data = { quotes, generatedAt: new Date().toISOString(), novelId };
+    setGalleryLocal(g => ({...g, [novelId]: data}));
+    try { await db.collection("gallery").doc(novelId).set(data); } catch(e) { console.error(e); }
+  };
+
+  // ギャラリー：手動で名言を上書き
+  const updateGalleryQuote = async (novelId, idx, newText) => {
+    const cur = gallery[novelId] || { quotes: [] };
+    const quotes = [...(cur.quotes||[])];
+    if(quotes[idx]) quotes[idx] = { ...quotes[idx], text: newText };
+    await saveGalleryQuotes(novelId, quotes);
+  };
+  const deleteGalleryQuote = async (novelId, idx) => {
+    const cur = gallery[novelId] || { quotes: [] };
+    const quotes = (cur.quotes||[]).filter((_,i)=>i!==idx);
+    await saveGalleryQuotes(novelId, quotes);
+  };
+  const addGalleryQuote = async (novelId, text, chapter) => {
+    const cur = gallery[novelId] || { quotes: [] };
+    const quotes = [...(cur.quotes||[]), { text, chapter: chapter||"" }];
+    await saveGalleryQuotes(novelId, quotes);
+  };
+
+  return { site, setSite, author, setAuthor, novels, messages, gallery, loading, dbError,
     addMessage, deleteMessage, markRead,
     addNovel, updateNovel, deleteNovel, addChapter, updateChapter, deleteChapter,
-    addMurmur, deleteMurmur, updateMurmur };
+    addMurmur, deleteMurmur, updateMurmur,
+    saveGalleryQuotes, updateGalleryQuote, deleteGalleryQuote, addGalleryQuote };
 }
 
 // ═══════════════ HELPERS ═══════════════
@@ -308,7 +380,6 @@ function Styles({site, lightMode}){
   const accent=site.theme?.accent||"#c8a86a";
   const bg=lightMode?"#f5f0e8":(site.theme?.bg||"#07070f");
   const font=site.theme?.font==="gothic"?"'Noto Sans JP',sans-serif":"'Cormorant Garamond','Noto Serif JP',serif";
-  // ライトモード時はテキスト色を反転
   const txt   = lightMode?"#1a1814":"#e2ddd4";
   const txt2  = lightMode?"#5c5650":"#8c8578";
   const txt3  = lightMode?"#9c9890":"#4a4840";
@@ -328,7 +399,6 @@ function Styles({site, lightMode}){
     .nav-center{display:flex;gap:4px}
     .nav-btn{background:none;border:none;cursor:pointer;font-family:var(--body);font-size:10px;letter-spacing:.26em;text-transform:uppercase;color:var(--txt3);padding:6px 12px;border-radius:2px;transition:color .25s,background .25s}
     .nav-btn:hover{color:var(--txt2)}.nav-btn.active{color:var(--accent);background:var(--accent-dim)}
-    /* HTG TOOLBAR */
     /* HERO */
     .hero{padding:130px 48px 80px;max-width:960px;margin:0 auto}
     .hero-eyebrow{margin-bottom:28px}.hero-line{width:28px;height:1px;background:var(--accent);display:inline-block;vertical-align:middle;margin-right:12px}
@@ -388,7 +458,6 @@ function Styles({site, lightMode}){
     .reading-back{background:none;border:none;cursor:pointer;color:var(--txt3);font-size:15px;padding:4px;transition:color .2s}.reading-back:hover{color:var(--accent)}
     .reading-crumb{font-size:11px;color:var(--txt3);letter-spacing:.1em}.reading-crumb b{color:var(--txt2);font-weight:400}
     .progress-rail{position:fixed;top:54px;left:0;right:0;height:2px;background:var(--border);z-index:500}.progress-fill{height:100%;background:var(--accent);transition:width .1s}
-    /* ── カクヨム風 本文エリア ── */
     .reading-wrap{background:var(--bg);min-height:100vh}
     .reading-content{max-width:820px;margin:0 auto;padding:88px 40px 60px}
     .reading-eyebrow{font-size:9px;letter-spacing:.44em;color:var(--accent);text-transform:uppercase;margin-bottom:20px;text-align:center}
@@ -457,11 +526,7 @@ function Styles({site, lightMode}){
     .form-input::placeholder,.form-textarea::placeholder{color:var(--txt3)}
     .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}.form-hint{font-size:11px;color:var(--txt2);margin-top:6px;letter-spacing:.04em}
     .color-row{display:flex;align-items:center;gap:12px}.color-swatch{width:36px;height:36px;border-radius:3px;border:1px solid rgba(255,255,255,.2);cursor:pointer;flex-shrink:0;transition:transform .15s}.color-swatch:hover{transform:scale(1.08)}.color-input-hidden{width:0;height:0;opacity:0;position:absolute}
-    /* カバープレビュー */
     .gradient-preview{height:140px;border-radius:6px;border:1px solid rgba(255,255,255,.12);margin-bottom:20px;position:relative;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.4)}
-    .gp-dot{position:absolute;top:14px;right:14px;width:10px;height:10px;border-radius:50%;box-shadow:0 0 10px currentColor}
-    .gp-title{position:absolute;bottom:16px;left:20px;font-family:var(--serif);font-size:20px;font-weight:300;color:#e8e4de;letter-spacing:.06em;text-shadow:0 1px 6px rgba(0,0,0,.7);line-height:1.2}
-    .gp-subtitle{position:absolute;bottom:16px;left:20px;font-family:var(--serif);font-size:20px;font-weight:300;color:#e8e4de;letter-spacing:.06em;text-shadow:0 1px 6px rgba(0,0,0,.7);line-height:1.2}
     .alist{display:flex;flex-direction:column;gap:1px;background:var(--border);margin-bottom:24px}
     .arow{background:var(--bg);display:flex;flex-direction:column;gap:10px;padding:14px 18px;transition:background .2s}.arow:hover{background:var(--deep)}
     .arow-top{display:flex;align-items:center;gap:10px;width:100%}
@@ -485,9 +550,6 @@ function Styles({site, lightMode}){
     .msg-hdr{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
     .msg-name{font-size:13px;color:var(--txt);font-weight:500}.msg-target{font-size:10px;letter-spacing:.18em;color:var(--accent);text-transform:uppercase;border:1px solid var(--accent-glow);padding:2px 8px;border-radius:1px}.msg-date{font-size:10px;color:var(--txt3);margin-left:auto}.msg-body{font-size:13px;line-height:1.9;color:var(--txt2);white-space:pre-wrap}.msg-acts{display:flex;gap:6px;margin-top:10px}
     .badge{background:var(--accent);color:var(--bg);font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;margin-left:6px}
-    /* ピン・ロック */
-    .novel-badge-pin{font-size:10px;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);padding:1px 7px;border-radius:2px;letter-spacing:.08em;flex-shrink:0}
-    .novel-badge-lock{font-size:10px;background:rgba(239,68,68,.12);border:1px solid #ef4444;color:#ef4444;padding:1px 7px;border-radius:2px;letter-spacing:.08em;flex-shrink:0}
     .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
     .toggle-label{font-size:13px;color:var(--txt);letter-spacing:.04em}
     .toggle-desc{font-size:11px;color:var(--txt2);margin-top:2px}
@@ -497,53 +559,201 @@ function Styles({site, lightMode}){
     .toggle-slider::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:var(--txt3);border-radius:50%;transition:transform .2s,background .2s}
     .toggle-switch input:checked+.toggle-slider{background:var(--accent-dim);border-color:var(--accent)}
     .toggle-switch input:checked+.toggle-slider::before{transform:translateX(18px);background:var(--accent)}
-    /* 文字数統計 */
     .wc-stat{font-family:var(--serif);font-size:11px;color:var(--txt3);letter-spacing:.1em;margin-left:4px}
     .wc-stat b{color:var(--accent);font-weight:400}
     .mobile-back-btn{display:none}
+
+    /* ═══════════════ GALLERY ═══════════════ */
+    /* 全画面スライド型ギャラリー */
+    .gallery-wrap{position:fixed;inset:0;z-index:600;background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+
+    /* ギャラリーナビバー */
+    .gallery-nav{position:absolute;top:0;left:0;right:0;height:60px;display:flex;align-items:center;padding:0 40px;z-index:10;background:linear-gradient(to bottom,var(--bg) 60%,transparent)}
+    .gallery-nav-back{background:none;border:none;cursor:pointer;color:var(--txt3);font-family:var(--body);font-size:10px;letter-spacing:.28em;text-transform:uppercase;padding:0;transition:color .25s}.gallery-nav-back:hover{color:var(--accent)}
+    .gallery-nav-title{font-family:var(--serif);font-size:13px;color:var(--txt3);letter-spacing:.14em;margin-left:auto}
+    .gallery-nav-count{font-size:10px;color:var(--txt3);letter-spacing:.18em;margin-left:20px}
+
+    /* スライドエリア */
+    .gallery-stage{flex:1;display:flex;align-items:center;justify-content:center;position:relative;padding:80px 60px}
+
+    /* 名言カード */
+    .gallery-card{
+      position:absolute;
+      inset:80px 60px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      padding:60px 80px;
+      opacity:0;
+      transform:translateY(24px) scale(.97);
+      transition:opacity .7s cubic-bezier(.4,0,.2,1), transform .7s cubic-bezier(.4,0,.2,1);
+      pointer-events:none;
+    }
+    .gallery-card.active{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+    .gallery-card.exit{opacity:0;transform:translateY(-24px) scale(.97)}
+
+    .gallery-quote-mark{
+      font-family:var(--serif);
+      font-size:120px;
+      line-height:.7;
+      color:var(--accent);
+      opacity:.12;
+      margin-bottom:20px;
+      font-style:italic;
+      user-select:none;
+    }
+    .gallery-quote-text{
+      font-family:'Noto Serif JP',serif;
+      font-size:clamp(16px,2.2vw,26px);
+      font-weight:300;
+      line-height:2.2;
+      color:var(--txt);
+      letter-spacing:.1em;
+      max-width:680px;
+      margin-bottom:40px;
+      position:relative;
+    }
+    .gallery-quote-text::before,.gallery-quote-text::after{
+      content:'';
+      position:absolute;
+      left:50%;
+      transform:translateX(-50%);
+      width:32px;
+      height:1px;
+      background:var(--accent);
+      opacity:.4;
+    }
+    .gallery-quote-text::before{top:-20px}
+    .gallery-quote-text::after{bottom:-20px}
+    .gallery-meta{display:flex;flex-direction:column;align-items:center;gap:6px}
+    .gallery-novel-name{font-size:11px;letter-spacing:.28em;color:var(--accent);text-transform:uppercase}
+    .gallery-chapter-name{font-size:10px;letter-spacing:.2em;color:var(--txt3)}
+
+    /* ドット（進行インジケーター） */
+    .gallery-dots{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10}
+    .gallery-dot{width:5px;height:5px;border-radius:50%;background:var(--border-hi);border:none;cursor:pointer;padding:0;transition:all .3s}
+    .gallery-dot.active{background:var(--accent);width:20px;border-radius:3px}
+
+    /* 矢印ボタン */
+    .gallery-arrow{
+      position:absolute;
+      top:50%;transform:translateY(-50%);
+      background:none;border:1px solid var(--border);
+      color:var(--txt3);width:48px;height:48px;
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;border-radius:50%;
+      transition:all .25s;z-index:10;
+      font-size:18px;
+    }
+    .gallery-arrow:hover{border-color:var(--accent);color:var(--accent)}
+    .gallery-arrow.left{left:24px}
+    .gallery-arrow.right{right:24px}
+    .gallery-arrow:disabled{opacity:.18;cursor:not-allowed}
+
+    /* 作品セレクター */
+    .gallery-novel-selector{
+      position:absolute;
+      bottom:28px;
+      left:50%;transform:translateX(-50%);
+      display:flex;gap:10px;flex-wrap:wrap;justify-content:center;
+      z-index:10;
+    }
+    .gallery-novel-tab{
+      background:none;border:1px solid var(--border);
+      color:var(--txt3);font-family:var(--body);
+      font-size:9px;letter-spacing:.22em;text-transform:uppercase;
+      padding:5px 14px;cursor:pointer;border-radius:1px;
+      transition:all .2s;
+    }
+    .gallery-novel-tab:hover{border-color:var(--border-hi);color:var(--txt2)}
+    .gallery-novel-tab.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+
+    /* ローディング状態 */
+    .gallery-loading{
+      display:flex;flex-direction:column;align-items:center;gap:24px;
+      color:var(--txt3);font-family:var(--serif);font-size:16px;letter-spacing:.14em;
+    }
+    .gallery-spinner{
+      width:32px;height:32px;border:1px solid var(--border);
+      border-top-color:var(--accent);border-radius:50%;
+      animation:spin .9s linear infinite;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* ギャラリーエントリーポイント（ホームページ）*/
+    .gallery-entry{
+      max-width:1120px;margin:0 auto;padding:0 48px 80px;
+      display:flex;align-items:center;gap:40px;
+      border-top:1px solid var(--border);
+      padding-top:60px;
+    }
+    .gallery-entry-text{flex:1}
+    .gallery-entry-eyebrow{font-size:9px;letter-spacing:.44em;color:var(--accent);text-transform:uppercase;margin-bottom:12px}
+    .gallery-entry-title{font-family:var(--serif);font-size:32px;font-weight:300;color:var(--txt);margin-bottom:12px;letter-spacing:.06em}
+    .gallery-entry-desc{font-size:13px;color:var(--txt2);line-height:2;letter-spacing:.04em}
+    .gallery-entry-btn{
+      background:none;border:1px solid var(--accent);
+      color:var(--accent);font-family:var(--body);
+      font-size:10px;letter-spacing:.3em;text-transform:uppercase;
+      padding:14px 32px;cursor:pointer;
+      transition:all .3s;border-radius:1px;
+      flex-shrink:0;
+    }
+    .gallery-entry-btn:hover{background:var(--accent-dim)}
+
+    /* 管理パネル：ギャラリー管理 */
+    .gallery-admin-card{
+      background:color-mix(in srgb,var(--bg) 94%,#888 6%);
+      border:1px solid var(--border-hi);
+      border-radius:3px;
+      margin-bottom:10px;
+      overflow:hidden;
+    }
+    .gallery-admin-quote{
+      padding:16px 18px;
+      border-bottom:1px solid var(--border);
+      display:flex;align-items:flex-start;gap:12px;
+    }
+    .gallery-admin-num{
+      font-family:var(--serif);font-size:11px;color:var(--txt3);
+      width:24px;flex-shrink:0;padding-top:2px;
+    }
+    .gallery-admin-text{
+      flex:1;font-family:'Noto Serif JP',serif;
+      font-size:13px;line-height:1.9;color:var(--txt2);
+    }
+    .gallery-admin-chapter{font-size:10px;color:var(--txt3);letter-spacing:.1em;margin-top:4px}
+    .gallery-admin-actions{display:flex;gap:6px;flex-shrink:0}
+
     @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
     @keyframes driftDown{0%{transform:translateY(-120px)}100%{transform:translateY(100vh)}}
-    /* ページ遷移オーバーレイ */
-    .pt-overlay{position:fixed;inset:0;z-index:8000;pointer-events:none;display:flex;align-items:center;justify-content:center;background:transparent}
-    .pt-ink-bg{position:absolute;inset:0;background:var(--bg);opacity:0}
-    .pt-kanji-svg{position:relative;z-index:1}
-    @keyframes ptBgIn{0%{opacity:0}100%{opacity:1}}
-    @keyframes ptBgOut{0%{opacity:1}100%{opacity:0}}
-    @keyframes ptKanjiOut{0%{opacity:1}50%{opacity:.6}100%{opacity:0}}
-    @keyframes ptColAppear{0%{transform:scaleY(0);transform-origin:top}100%{transform:scaleY(1);transform-origin:top}}
-    @keyframes ptColFade{0%{opacity:1}100%{opacity:0}}
-    @keyframes ptGridFadeOut{0%{opacity:1}60%{opacity:.7}100%{opacity:0}}
-    .pt-grid-overlay{position:fixed;inset:0;z-index:8000;pointer-events:none;display:flex;flex-direction:row-reverse;align-items:stretch}
-    .pt-grid-col{height:100%;display:flex;flex-direction:column;opacity:0}
-    .pt-grid-cell{border:1px solid;flex-shrink:0}
     .pt-overlay{position:fixed;inset:0;z-index:8000;pointer-events:none;overflow:hidden}
-    .pt-ink{position:absolute;inset:0;background:var(--bg);transform-origin:center;opacity:0}
-    .pt-slide{position:absolute;inset:0;background:var(--bg);transform:translateX(-100%)}
-    .pt-char{position:fixed;font-family:var(--serif);color:var(--txt2);pointer-events:none;z-index:8001;opacity:0;font-size:18px;transition:none}
-    @keyframes ptCharScatter{0%{opacity:.7;transform:translate(0,0) rotate(0deg) scale(1)}100%{opacity:0;transform:var(--tx) rotate(var(--rot)) scale(.4)}}
-    @keyframes ptInkIn{0%{opacity:0}60%{opacity:1}100%{opacity:1}}
-    @keyframes ptInkOut{0%{opacity:1}100%{opacity:0}}
-    @keyframes ptSlideIn{0%{transform:translateX(-6%)}100%{transform:translateX(0)}}
-    @keyframes driftUp{0%{transform:translateY(110vh)}100%{transform:translateY(-120px)}}
     .bg-text-layer{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
     .bg-text-col{position:absolute;top:0;display:flex;flex-direction:column;gap:2.2em;writing-mode:vertical-rl;text-orientation:mixed;font-family:var(--serif);white-space:nowrap;will-change:transform}
     .rise{animation:rise .6s ease forwards;opacity:0}.d1{animation-delay:.04s}.d2{animation-delay:.14s}.d3{animation-delay:.26s}.d4{animation-delay:.38s}
     @keyframes fadein{from{opacity:0}to{opacity:1}}.fadein{animation:fadein .3s ease forwards}
     ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border-hi)}
+
     @media(max-width:680px){
       .nav{padding:0 16px}.hero{padding:100px 20px 60px}.section,.detail-body{padding-left:20px;padding-right:20px}
       .detail-hero-content{padding:0 20px}.reading-content{padding-left:20px;padding-right:20px;padding-top:72px}.reading-foot{padding-left:20px;padding-right:20px}
       .profile-wrap,.htg-wrap{padding:100px 20px 72px}.footer{padding:32px 20px}
       .admin-overlay{flex-direction:column}
-      /* モバイル：メニュー選択前はサイドバーのみ、選択後はメインのみ */
       .admin-sidebar{width:100%;max-height:none;height:100%}
       .admin-main{display:none;padding:20px 16px 120px}
       .admin-overlay.menu-selected .admin-sidebar{display:none}
       .admin-overlay.menu-selected .admin-main{display:block}
       .save-bar{left:0}
       .form-row{grid-template-columns:1fr}
-      /* モバイル戻るボタン */
       .mobile-back-btn{display:flex;align-items:center;gap:8px;background:none;border:none;color:var(--accent);font-family:var(--body);font-size:13px;letter-spacing:.08em;padding:0 0 20px;cursor:pointer}
+      .gallery-card{padding:40px 24px;inset:70px 16px}
+      .gallery-arrow{display:none}
+      .gallery-dots{bottom:52px}
+      .gallery-novel-selector{bottom:14px}
+      .gallery-quote-text{font-size:15px}
+      .gallery-entry{flex-direction:column;gap:24px;padding:40px 20px 60px}
     }
   `);
 }
@@ -621,6 +831,7 @@ function Nav({page,onNav,site,onLogoClick,lightMode,onToggleLight}){
       </div>
       <div className="nav-center">
         <button className={`nav-btn ${page==="home"?"active":""}`} onClick={()=>onNav("home")}>作品一覧</button>
+        <button className={`nav-btn ${page==="gallery"?"active":""}`} onClick={()=>onNav("gallery")}>ギャラリー</button>
         <button className={`nav-btn ${page==="hitorigoto"?"active":""}`} onClick={()=>onNav("hitorigoto")}>ひとりごと</button>
         <button className={`nav-btn ${page==="profile"?"active":""}`} onClick={()=>onNav("profile")}>著者</button>
       </div>
@@ -632,7 +843,6 @@ function Nav({page,onNav,site,onLogoClick,lightMode,onToggleLight}){
 }
 
 // ═══════════════ HOME ═══════════════
-// 本文から文字数を実カウント（空白・改行除く）
 function countChars(novel) {
   return (novel.chapters||[]).reduce((s,ch)=>s+(ch.content||"").replace(/\s/g,"").length, 0);
 }
@@ -642,12 +852,11 @@ function fmtCount(n) {
   return `${n.toLocaleString()}字`;
 }
 
-function HomePage({site,novels,onOpen}){
+function HomePage({site,novels,onOpen,onGallery}){
   const [activeTag,setActiveTag]=useState(null);
   const [byDate,setByDate]=useState(false);
   const allTags=useMemo(()=>[...new Set(novels.flatMap(n=>n.tags||[]))] ,[novels]);
 
-  // order順 → ピン固定を先頭に
   const sorted=useMemo(()=>{
     const ordered=[...novels].sort((a,b)=>(a.order??9999)-(b.order??9999));
     const pinned=ordered.filter(n=>n.pinned);
@@ -661,11 +870,8 @@ function HomePage({site,novels,onOpen}){
     return list;
   },[sorted,activeTag]);
 
-  // 総文字数（全作品）
   const totalChars=useMemo(()=>novels.reduce((s,n)=>s+countChars(n),0),[novels]);
-
   const grouped=useMemo(()=>groupByYM(filtered,n=>n.updated),[filtered]);
-
   const lines=(site.catchcopy||"").split("、");
 
   const renderGrid=list=>(
@@ -723,8 +929,237 @@ function HomePage({site,novels,onOpen}){
           }
         </div>
       </section>
+      {/* ギャラリーへの誘導 */}
+      {novels.length > 0 && (
+        <div className="gallery-entry rise d4">
+          <div className="gallery-entry-text">
+            <div className="gallery-entry-eyebrow">Literary Gallery</div>
+            <div className="gallery-entry-title">名言・名文 ギャラリー</div>
+            <div className="gallery-entry-desc">全作品から厳選された言葉たちを、一枚ずつ味わう。</div>
+          </div>
+          <button className="gallery-entry-btn" onClick={onGallery}>ギャラリーへ →</button>
+        </div>
+      )}
       <Footer site={site}/>
     </>
+  );
+}
+
+// ═══════════════ GALLERY PAGE ═══════════════
+function GalleryPage({novels, gallery, onBack, saveGalleryQuotes}){
+  const [selectedNovelId, setSelectedNovelId] = useState(null);
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [animState, setAnimState] = useState("active"); // active | exit
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState("");
+  const [shuffledQuotes, setShuffledQuotes] = useState([]);
+
+  // 作品を選択：デフォルトは最初の作品
+  const novelsWithContent = useMemo(()=>
+    novels.filter(n=>(n.chapters||[]).some(ch=>(ch.content||"").trim().length > 30)),
+  [novels]);
+
+  useEffect(()=>{
+    if(novelsWithContent.length > 0 && !selectedNovelId){
+      setSelectedNovelId(novelsWithContent[0].id);
+    }
+  },[novelsWithContent]);
+
+  const selectedNovel = novels.find(n=>n.id===selectedNovelId);
+  const galleryData = gallery[selectedNovelId];
+  const hasQuotes = galleryData && (galleryData.quotes||[]).length > 0;
+
+  // 名言をシャッフルして表示用に準備
+  useEffect(()=>{
+    if(hasQuotes){
+      const q = [...galleryData.quotes];
+      // Fisher-Yates shuffle
+      for(let i=q.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [q[i],q[j]]=[q[j],q[i]];
+      }
+      setShuffledQuotes(q);
+      setCurrentIdx(0);
+      setAnimState("active");
+    }
+  },[selectedNovelId, galleryData?.generatedAt]);
+
+  // 作品切り替え
+  const switchNovel = (id) => {
+    if(id===selectedNovelId) return;
+    setAnimState("exit");
+    setTimeout(()=>{
+      setSelectedNovelId(id);
+      setCurrentIdx(0);
+      setAnimState("active");
+    }, 400);
+  };
+
+  // スライド遷移
+  const goTo = (idx) => {
+    if(idx===currentIdx||!hasQuotes) return;
+    setAnimState("exit");
+    setTimeout(()=>{
+      setCurrentIdx(idx);
+      setAnimState("active");
+    }, 350);
+  };
+  const prev = () => goTo(Math.max(0, currentIdx-1));
+  const next = () => goTo(Math.min(shuffledQuotes.length-1, currentIdx+1));
+
+  // キーボード操作
+  useEffect(()=>{
+    const fn=(e)=>{
+      if(e.key==="ArrowRight"||e.key==="ArrowDown") next();
+      if(e.key==="ArrowLeft"||e.key==="ArrowUp") prev();
+      if(e.key==="Escape") onBack();
+    };
+    window.addEventListener("keydown",fn);
+    return()=>window.removeEventListener("keydown",fn);
+  },[currentIdx,shuffledQuotes.length]);
+
+  // スワイプ操作
+  const touchStartX = useRef(null);
+  const handleTouchStart = (e)=>{ touchStartX.current=e.touches[0].clientX; };
+  const handleTouchEnd = (e)=>{
+    if(touchStartX.current===null) return;
+    const dx=e.changedTouches[0].clientX-touchStartX.current;
+    if(Math.abs(dx)>60){ dx<0?next():prev(); }
+    touchStartX.current=null;
+  };
+
+  // AI名言生成
+  const generate = async () => {
+    if(!selectedNovel) return;
+    setGenerating(true);
+    setGenError("");
+    try {
+      const quotes = await generateQuotesForNovel(selectedNovel);
+      if(quotes.length === 0){
+        setGenError("名言を生成できませんでした。本文が十分に記述されているか確認してください。");
+      } else {
+        await saveGalleryQuotes(selectedNovelId, quotes);
+      }
+    } catch(e) {
+      setGenError("エラーが発生しました: " + e.message);
+    }
+    setGenerating(false);
+  };
+
+  const currentQuote = shuffledQuotes[currentIdx];
+
+  // アクセントカラー（選択中の作品のもの）
+  const accentColor = selectedNovel?.accent || "var(--accent)";
+
+  return(
+    <div className="gallery-wrap fadein"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* 背景グラデーション（作品カラー） */}
+      {selectedNovel && (
+        <div style={{
+          position:"absolute",inset:0,
+          background:`radial-gradient(ellipse at 50% 30%, color-mix(in srgb, ${selectedNovel.color2} 30%, transparent), transparent 70%)`,
+          transition:"background 1s ease",
+          pointerEvents:"none",
+          zIndex:0,
+        }}/>
+      )}
+
+      {/* ナビゲーション */}
+      <div className="gallery-nav">
+        <button className="gallery-nav-back" onClick={onBack}>← 戻る</button>
+        <div className="gallery-nav-title">Literary Gallery</div>
+        {hasQuotes&&<div className="gallery-nav-count">{currentIdx+1} / {shuffledQuotes.length}</div>}
+      </div>
+
+      {/* メインステージ */}
+      <div className="gallery-stage" style={{zIndex:1}}>
+        {novelsWithContent.length === 0 ? (
+          <div className="gallery-loading">
+            <div style={{fontSize:14,color:"var(--txt3)",letterSpacing:".14em"}}>作品が見つかりません</div>
+            <div style={{fontSize:12,color:"var(--txt3)"}}>まず作品と本文を追加してください</div>
+          </div>
+        ) : generating ? (
+          <div className="gallery-loading">
+            <div className="gallery-spinner"/>
+            <div style={{fontFamily:"var(--serif)"}}>AIが本文を精読し、名言を選出しています…</div>
+            <div style={{fontSize:12,color:"var(--txt3)",letterSpacing:".12em",marginTop:4}}>しばらくお待ちください</div>
+          </div>
+        ) : !hasQuotes ? (
+          <div className="gallery-loading" style={{gap:20}}>
+            <div style={{fontSize:13,color:"var(--txt3)",letterSpacing:".12em",maxWidth:400,textAlign:"center",lineHeight:2}}>
+              「{selectedNovel?.title}」の名言・名文がまだ選出されていません。<br/>
+              AIが本文を精読して10個の名言を厳選します。
+            </div>
+            {genError && <div style={{fontSize:12,color:"#ef4444",maxWidth:400,textAlign:"center"}}>{genError}</div>}
+            <button className="btn btn-primary" onClick={generate}
+              style={{letterSpacing:".22em",padding:"12px 32px",fontSize:11}}>
+              ✦ 名言を選出する
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* 左矢印 */}
+            <button className="gallery-arrow left" onClick={prev} disabled={currentIdx===0}>‹</button>
+
+            {/* 名言カード */}
+            {shuffledQuotes.map((q,i)=>(
+              <div
+                key={i}
+                className={`gallery-card ${i===currentIdx ? animState : ""}`}
+                style={{zIndex:i===currentIdx?2:1}}
+              >
+                <div className="gallery-quote-mark" style={{color:accentColor}}>"</div>
+                <div className="gallery-quote-text"
+                  style={{
+                    textShadow: `0 0 60px ${accentColor}18`,
+                  }}
+                >
+                  {q.text}
+                </div>
+                <div className="gallery-meta">
+                  <div className="gallery-novel-name" style={{color:accentColor}}>
+                    {selectedNovel?.title}
+                  </div>
+                  {q.chapter && <div className="gallery-chapter-name">{q.chapter}</div>}
+                </div>
+              </div>
+            ))}
+
+            {/* 右矢印 */}
+            <button className="gallery-arrow right" onClick={next} disabled={currentIdx===shuffledQuotes.length-1}>›</button>
+          </>
+        )}
+      </div>
+
+      {/* ドットインジケーター */}
+      {hasQuotes && shuffledQuotes.length > 1 && (
+        <div className="gallery-dots" style={{zIndex:2}}>
+          {shuffledQuotes.map((_,i)=>(
+            <button key={i} className={`gallery-dot ${i===currentIdx?"active":""}`}
+              style={i===currentIdx?{background:accentColor}:{}}
+              onClick={()=>goTo(i)}/>
+          ))}
+        </div>
+      )}
+
+      {/* 作品タブ */}
+      {novelsWithContent.length > 1 && (
+        <div className="gallery-novel-selector" style={{zIndex:2,bottom:hasQuotes?"52px":"28px"}}>
+          {novelsWithContent.map(n=>(
+            <button key={n.id}
+              className={`gallery-novel-tab ${n.id===selectedNovelId?"active":""}`}
+              style={n.id===selectedNovelId?{borderColor:n.accent,color:n.accent,background:`${n.accent}14`}:{}}
+              onClick={()=>switchNovel(n.id)}
+            >
+              {n.title}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -773,7 +1208,6 @@ function DetailPage({novel,onBack,onRead,onSendMessage}){
 }
 
 // ═══════════════ READING ═══════════════
-// 改行ルール：1改行→段落、空行（連続改行）→そのまま空白として表示
 function renderBody(content, indent=true) {
   const lines = content.split("\n");
   const result = [];
@@ -822,7 +1256,6 @@ function HitorigotoPage({author}){
   const [byDate,setByDate]=useState(false);
   const murmurs=useMemo(()=>author.murmurs||[],[author.murmurs]);
   const filtered=murmurs;
-  // 古い順に並べ直してからグループ化
   const sortedAsc=useMemo(()=>[...filtered].sort((a,b)=>{
     const da=new Date(a.isoDate||a.date), db2=new Date(b.isoDate||b.date);
     return da-db2;
@@ -973,10 +1406,134 @@ function MurmurEditList({murmurs, onUpdate, onDelete}){
   );
 }
 
+// ═══════════════ GALLERY ADMIN PANEL ═══════════════
+function GalleryAdminPanel({novels, gallery, saveGalleryQuotes, updateGalleryQuote, deleteGalleryQuote, addGalleryQuote}){
+  const [selectedId, setSelectedId] = useState(novels[0]?.id||"");
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [editIdx, setEditIdx] = useState(null);
+  const [editText, setEditText] = useState("");
+  const [newText, setNewText] = useState("");
+  const [newChapter, setNewChapter] = useState("");
+
+  const selectedNovel = novels.find(n=>n.id===selectedId);
+  const galleryData = gallery[selectedId];
+  const quotes = galleryData?.quotes||[];
+
+  const generate = async () => {
+    if(!selectedNovel) return;
+    setGenerating(true);
+    setGenError("");
+    try {
+      const q = await generateQuotesForNovel(selectedNovel);
+      if(q.length===0){
+        setGenError("名言を生成できませんでした。本文を確認してください。");
+      } else {
+        await saveGalleryQuotes(selectedId, q);
+        setSaved(true); setTimeout(()=>setSaved(false),2000);
+      }
+    } catch(e) {
+      setGenError("エラー: "+e.message);
+    }
+    setGenerating(false);
+  };
+
+  const startEdit=(i,text)=>{ setEditIdx(i); setEditText(text); };
+  const saveEdit=async()=>{
+    await updateGalleryQuote(selectedId, editIdx, editText);
+    setEditIdx(null);
+  };
+
+  return(
+    <div className="fadein">
+      <div className="admin-title">ギャラリー管理</div>
+      <div className="form-group">
+        <label className="form-label">作品を選択</label>
+        <select className="form-input" value={selectedId} onChange={e=>{ setSelectedId(e.target.value); setEditIdx(null); }} style={{cursor:"pointer"}}>
+          {novels.map(n=><option key={n.id} value={n.id}>{n.title}</option>)}
+        </select>
+      </div>
+
+      {selectedNovel && (
+        <>
+          <div style={{background:"color-mix(in srgb,var(--bg) 92%,#888 8%)",border:"1px solid var(--border-hi)",padding:20,borderRadius:3,marginBottom:24}}>
+            <div style={{fontSize:13,color:"var(--txt2)",lineHeight:1.9,marginBottom:14}}>
+              「{selectedNovel.title}」の名言・名文を<b style={{color:"var(--txt)"}}>AIが本文を精読</b>して厳選します。<br/>
+              生成には数秒かかります。既存の名言は上書きされます。
+            </div>
+            <button className="btn btn-primary" disabled={generating} onClick={generate}
+              style={{letterSpacing:".18em"}}>
+              {generating?"⌛ 生成中…":"✦ AI で名言を自動選出（10個）"}
+            </button>
+            {saved&&<span style={{marginLeft:12,fontSize:12,color:"var(--accent)"}}>✓ 保存しました</span>}
+            {genError&&<div style={{marginTop:8,fontSize:12,color:"#ef4444"}}>{genError}</div>}
+            {galleryData?.generatedAt&&<div style={{marginTop:8,fontSize:10,color:"var(--txt3)"}}>最終生成: {new Date(galleryData.generatedAt).toLocaleString("ja-JP")}</div>}
+          </div>
+
+          {/* 名言一覧 */}
+          {quotes.length>0 && (
+            <>
+              <div style={{fontSize:12,color:"var(--txt3)",marginBottom:12,letterSpacing:".1em"}}>{quotes.length}件の名言</div>
+              <div style={{display:"flex",flexDirection:"column",gap:1,background:"var(--border)",marginBottom:24}}>
+                {quotes.map((q,i)=>(
+                  <div key={i} className="gallery-admin-quote" style={{background:"var(--bg)"}}>
+                    <div className="gallery-admin-num">{i+1}</div>
+                    <div style={{flex:1}}>
+                      {editIdx===i ? (
+                        <>
+                          <textarea className="form-textarea" value={editText} onChange={e=>setEditText(e.target.value)} rows={3} style={{marginBottom:8,fontSize:13}}/>
+                          <div style={{display:"flex",gap:8}}>
+                            <button className="btn btn-primary" style={{fontSize:11,padding:"4px 12px"}} onClick={saveEdit}>保存</button>
+                            <button className="btn" style={{fontSize:11,padding:"4px 12px"}} onClick={()=>setEditIdx(null)}>キャンセル</button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="gallery-admin-text">{q.text}</div>
+                          {q.chapter&&<div className="gallery-admin-chapter">出典: {q.chapter}</div>}
+                        </>
+                      )}
+                    </div>
+                    {editIdx!==i&&(
+                      <div className="gallery-admin-actions">
+                        <button className="icon-btn" style={{fontSize:11}} onClick={()=>startEdit(i,q.text)}>✏️</button>
+                        <button className="icon-btn danger" style={{fontSize:11}} onClick={()=>deleteGalleryQuote(selectedId,i)}>🗑</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* 手動追加 */}
+          <div style={{background:"color-mix(in srgb,var(--bg) 92%,#888 8%)",border:"1px solid var(--border-hi)",padding:20,borderRadius:3}}>
+            <div style={{fontSize:11,color:"var(--txt2)",letterSpacing:".14em",marginBottom:14}}>手動で名言を追加</div>
+            <div className="form-group" style={{marginBottom:10}}>
+              <textarea className="form-textarea" value={newText} onChange={e=>setNewText(e.target.value)} rows={3} placeholder="名言・名文を入力" style={{fontSize:13}}/>
+            </div>
+            <div className="form-group" style={{marginBottom:12}}>
+              <input className="form-input" value={newChapter} onChange={e=>setNewChapter(e.target.value)} placeholder="出典章タイトル（任意）" style={{fontSize:13}}/>
+            </div>
+            <button className="btn" disabled={!newText.trim()} onClick={async()=>{
+              await addGalleryQuote(selectedId, newText.trim(), newChapter.trim());
+              setNewText(""); setNewChapter("");
+            }}>＋ 追加する</button>
+          </div>
+        </>
+      )}
+      {novels.length===0&&<div style={{color:"var(--txt3)",fontSize:13}}>作品がありません</div>}
+    </div>
+  );
+}
+
 // ═══════════════ ADMIN ═══════════════
 function AdminPanel({store,onClose}){
-  const {site,setSite,author,setAuthor,novels,messages,deleteMessage,markRead,
-    addNovel,updateNovel,deleteNovel,addChapter,updateChapter,deleteChapter,addMurmur,deleteMurmur,updateMurmur}=store;
+  const {site,setSite,author,setAuthor,novels,messages,gallery,deleteMessage,markRead,
+    addNovel,updateNovel,deleteNovel,addChapter,updateChapter,deleteChapter,
+    addMurmur,deleteMurmur,updateMurmur,
+    saveGalleryQuotes,updateGalleryQuote,deleteGalleryQuote,addGalleryQuote}=store;
   const [sec,setSec]=useState("site");
   const [editNid,setEditNid]=useState(null);
   const [editCh,setEditCh]=useState(null);
@@ -1013,6 +1570,7 @@ function AdminPanel({store,onClose}){
     {id:"author",label:"著者プロフィール",icon:"✍️"},
     {id:"links",label:"SNS・リンク",icon:"🔗"},
     {id:"hitorigoto",label:"ひとりごと管理",icon:"💬"},
+    {id:"gallery_admin",label:"ギャラリー管理",icon:"✦"},
     {id:"messages",label:"受信メッセージ",icon:"✉️",badge:unread},
     {id:"theme",label:"デザイン・テーマ",icon:"🎨"},
     {id:"novels",label:"作品管理",icon:"📚"},
@@ -1020,7 +1578,6 @@ function AdminPanel({store,onClose}){
 
   const [menuSelected, setMenuSelected] = useState(false);
 
-  // スマホ：メニュー項目を選択したら全画面コンテンツ表示
   const selectSec = (id) => {
     setSec(id); setEditNid(null); setEditCh(null);
     setMenuSelected(true);
@@ -1054,7 +1611,6 @@ function AdminPanel({store,onClose}){
       </div>
 
       <div className="admin-main">
-        {/* モバイル：コンテンツ画面上部に「← メニューへ」ボタン */}
         <button className="mobile-back-btn" onClick={goBackToMenu}>← メニューへ</button>
 
         {sec==="site"&&(
@@ -1085,7 +1641,6 @@ function AdminPanel({store,onClose}){
                     <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>setAuthor(a=>({...a,icon:ev.target.result})); r.readAsDataURL(f); }}/>
                   </label>
                   {author.icon&&<button className="btn btn-danger" style={{marginLeft:8}} onClick={()=>setAuthor(a=>({...a,icon:""}))}>削除</button>}
-                  <div className="form-hint" style={{marginTop:6}}>JPG / PNG / GIF</div>
                 </div>
               </div>
             </div>
@@ -1161,6 +1716,17 @@ function AdminPanel({store,onClose}){
           </div>
         )}
 
+        {sec==="gallery_admin"&&(
+          <GalleryAdminPanel
+            novels={novels}
+            gallery={gallery}
+            saveGalleryQuotes={saveGalleryQuotes}
+            updateGalleryQuote={updateGalleryQuote}
+            deleteGalleryQuote={deleteGalleryQuote}
+            addGalleryQuote={addGalleryQuote}
+          />
+        )}
+
         {sec==="messages"&&(
           <div className="fadein">
             <div className="admin-title">受信メッセージ {unread>0&&<span className="badge" style={{fontSize:14}}>{unread}件未読</span>}</div>
@@ -1211,20 +1777,15 @@ function AdminPanel({store,onClose}){
         {sec==="novels"&&(
           <div className="fadein">
             <div className="admin-title">作品管理</div>
-            <div style={{marginBottom:12,fontSize:12,color:"var(--txt3)"}}>↕ ボタンで表示順を変更できます（ピン固定は常に先頭）</div>
+            <div style={{marginBottom:12,fontSize:12,color:"var(--txt3)"}}>↕ ボタンで表示順を変更できます</div>
             <div className="alist">
               {novels.length===0&&<div style={{padding:"24px",color:"var(--txt3)",fontSize:13}}>作品がありません</div>}
               {(()=>{
-                // order付きで並べる（orderがなければFirestore取得順）
-                const ordered=[...novels].sort((a,b)=>{
-                  const ao=a.order??9999, bo=b.order??9999;
-                  return ao-bo;
-                });
+                const ordered=[...novels].sort((a,b)=>(a.order??9999)-(b.order??9999));
                 const moveNovel=(id,dir)=>{
                   const idx=ordered.findIndex(n=>n.id===id);
                   const target=idx+dir;
                   if(target<0||target>=ordered.length) return;
-                  // swap order values
                   const newOrdered=[...ordered];
                   [newOrdered[idx],newOrdered[target]]=[newOrdered[target],newOrdered[idx]];
                   newOrdered.forEach((n,i)=>updateNovel(n.id,{order:i}));
@@ -1238,16 +1799,12 @@ function AdminPanel({store,onClose}){
                       </div>
                       <div className="arow-dot" style={{background:n.accent,boxShadow:`0 0 8px ${n.accent}66`,flexShrink:0}}/>
                       <div className="arow-info">
-                        <div className="arow-title">
-                          {n.pinned&&<span style={{fontSize:11,marginRight:4}}>📌</span>}
-                          {n.locked&&<span style={{fontSize:11,marginRight:4}}>🔒</span>}
-                          {n.title}
-                        </div>
+                        <div className="arow-title">{n.pinned&&<span style={{fontSize:11,marginRight:4}}>📌</span>}{n.locked&&<span style={{fontSize:11,marginRight:4}}>🔒</span>}{n.title}</div>
                         <div className="arow-meta">{n.author} · {(n.chapters||[]).length}章 · {fmtCount(countChars(n))}</div>
                       </div>
                     </div>
                     <div className="arow-actions">
-                      <button className={`icon-btn ${n.pinned?"primary":""}`} onClick={()=>updateNovel(n.id,{pinned:!n.pinned})}>{n.pinned?"📌":"📌"} {n.pinned?"固定解除":"固定"}</button>
+                      <button className={`icon-btn ${n.pinned?"primary":""}`} onClick={()=>updateNovel(n.id,{pinned:!n.pinned})}>📌 {n.pinned?"固定解除":"固定"}</button>
                       <button className={`icon-btn ${n.locked?"danger":""}`} onClick={()=>updateNovel(n.id,{locked:!n.locked})}>{n.locked?"🔒":"🔓"} {n.locked?"解除":"ロック"}</button>
                       <button className="icon-btn primary" onClick={()=>{ setEditNid(n.id); setSec("novel_edit"); setMenuSelected(true); }}>✏️ 編集</button>
                       <button className="icon-btn danger" disabled={!!n.locked} style={{opacity:n.locked?.3:1,cursor:n.locked?"not-allowed":"pointer"}} onClick={()=>!n.locked&&setDelConfirm({type:"novel",id:n.id,label:n.title})}>🗑</button>
@@ -1285,10 +1842,9 @@ function AdminPanel({store,onClose}){
               <span style={{fontFamily:"var(--serif)",fontSize:22,color:"var(--accent)",marginLeft:"auto"}}>{fmtCount(countChars(eNov))}</span>
               <span style={{fontSize:11,color:"var(--txt2)"}}>/ {(eNov.chapters||[]).length}章</span>
             </div>
-            {/* カバープレビュー */}
             <div className="gradient-preview" style={{background:`linear-gradient(160deg,${eNov.color1},${eNov.color2})`}}>
               <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.55) 0%,transparent 60%)"}}/>
-              <div className="gp-dot" style={{background:eNov.accent,color:eNov.accent}}/>
+              <div style={{position:"absolute",top:14,right:14,width:10,height:10,borderRadius:"50%",background:eNov.accent,boxShadow:`0 0 10px ${eNov.accent}`}}/>
               <div style={{position:"absolute",bottom:16,left:20,right:20}}>
                 <div style={{fontFamily:"var(--serif)",fontSize:20,fontWeight:300,color:"#e8e4de",letterSpacing:".06em",textShadow:"0 1px 6px rgba(0,0,0,.7)",lineHeight:1.25,marginBottom:3}}>{eNov.title||"タイトル"}</div>
                 {eNov.subtitle&&<div style={{fontSize:11,color:"rgba(232,228,222,.65)",letterSpacing:".08em",fontStyle:"italic"}}>{eNov.subtitle}</div>}
@@ -1387,27 +1943,23 @@ function AdminPanel({store,onClose}){
   );
 }
 
-// ═══════════════ ROOT ═══════════════
 // ═══════════════ BG TEXT LAYER ═══════════════
 function BgTextLayer({novels}){
   const [cols, setCols] = React.useState([]);
-  const poolRef = React.useRef([]);    // 未使用フレーズのキュー
-  const usedRef = React.useRef([]);    // 使用済みフレーズ
-  const colTimersRef = React.useRef({}); // 列ごとのタイマー
+  const poolRef = React.useRef([]);
+  const usedRef = React.useRef([]);
+  const colTimersRef = React.useRef({});
 
-  // 全文プールを抽出してpoolRefに格納
   const buildPool = React.useCallback((nvls)=>{
     const sentences = [];
     nvls.forEach(n=>{
       (n.chapters||[]).forEach(ch=>{
         const txt = (ch.content||"").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
-        // セリフ抽出
         const dialogRe = /[「『]((?:[^「『」』]|(?:[「『][^「『」』]*[」』]))*)[」』]/g;
         let m;
         while((m=dialogRe.exec(txt))!==null){
           const s=m[0].trim(); if(s.length>=6) sentences.push(s);
         }
-        // 地の文（句点単位）
         const masked=txt.replace(/[「『]((?:[^「『」』]|(?:[「『][^「『」』]*[」』]))*)[」』]/g,s=>"　".repeat(s.length));
         masked.split(/(?<=。)/).forEach((_,i,arr)=>{
           let pos=0; for(let j=0;j<i;j++) pos+=arr[j].length;
@@ -1417,12 +1969,10 @@ function BgTextLayer({novels}){
         });
       });
     });
-    // シャッフルしてpoolに
     poolRef.current=[...sentences].sort(()=>Math.random()-.5);
     usedRef.current=[];
   },[]);
 
-  // プールから次のフレーズを取得（尽きたら使用済みをシャッフルして再投入）
   const nextPhrase = React.useCallback(()=>{
     if(poolRef.current.length===0){
       if(usedRef.current.length===0) return null;
@@ -1435,7 +1985,6 @@ function BgTextLayer({novels}){
     return toV(phrase);
   },[]);
 
-  // 列の初期化
   React.useEffect(()=>{
     if(!novels||novels.length===0) return;
     buildPool(novels);
@@ -1458,10 +2007,8 @@ function BgTextLayer({novels}){
     });
     setCols(initial);
 
-    // 各列のアニメ終了タイミングで次のフレーズに差し替え
     initial.forEach(col=>{
       const schedule=()=>{
-        // delay補正後の残り時間
         const remaining = col.dur*1000 - Math.abs(col.delay)*1000;
         const wait = remaining > 0 ? remaining : col.dur*1000;
         const timer=setTimeout(()=>{
@@ -1472,7 +2019,6 @@ function BgTextLayer({novels}){
               ? {...c, text:phrase, delay:0, goUp:Math.random()>.5, dur:44+Math.random()*26, opacity:0.042+Math.random()*0.028, key:c.key}
               : c
           ));
-          // 次のサイクルをスケジュール
           colTimersRef.current[col.key]=setTimeout(function loop(){
             const p2=nextPhrase(); if(!p2) return;
             setCols(prev=>prev.map(c=>
@@ -1518,9 +2064,10 @@ function BgTextLayer({novels}){
   );
 }
 
+// ═══════════════ ROOT ═══════════════
 function App(){
   const store=useStore();
-  const {site,author,novels,addMessage,loading,dbError}=store;
+  const {site,author,novels,gallery,addMessage,loading,dbError,saveGalleryQuotes}=store;
   const [page,setPage]=useState("home");
   const [novel,setNovel]=useState(null);
   const [chapterId,setChapterId]=useState(null);
@@ -1528,7 +2075,6 @@ function App(){
   const [showLogin,setShowLogin]=useState(false);
   const [authed,setAuthed]=useState(false);
   const [lightMode,setLightMode]=useState(false);
-
   const [transiting,setTransiting]=useState(false);
   const [visPage,setVisPage]=useState("home");
 
@@ -1538,21 +2084,7 @@ function App(){
     (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0;clip-path:circle(0% at 100% 100%)";ov.style.transition="opacity 1s cubic-bezier(.4,0,.2,1),clip-path 1s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1";ov.style.clipPath="circle(150% at 100% 100%)"}));setTimeout(done,1050);},
     (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);transform:translateX(-100%)";ov.style.transition="transform .9s cubic-bezier(.77,0,.18,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.transform="translateX(0)"}));setTimeout(done,950);},
     (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);transform:translateX(100%)";ov.style.transition="transform .9s cubic-bezier(.77,0,.18,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.transform="translateX(0)"}));setTimeout(done,950);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);transform:translateY(-100%)";ov.style.transition="transform .9s cubic-bezier(.77,0,.18,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.transform="translateY(0)"}));setTimeout(done,950);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);transform:translateY(100%)";ov.style.transition="transform .9s cubic-bezier(.77,0,.18,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.transform="translateY(0)"}));setTimeout(done,950);},
     (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0";ov.style.transition="opacity 1s ease";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:polygon(50% 50%,50% 50%,50% 50%,50% 50%)";ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="polygon(50% -50%,150% 50%,50% 150%,-50% 50%)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:inset(0 50% 0 50%)";ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="inset(0 0% 0 0%)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:inset(50% 0 50% 0)";ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="inset(0% 0 0% 0)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0;transform:scale(.88)";ov.style.transition="opacity .85s ease,transform .85s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1";ov.style.transform="scale(1)"}));setTimeout(done,900);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);opacity:0;transform:scale(1.12)";ov.style.transition="opacity .85s ease,transform .85s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1";ov.style.transform="scale(1)"}));setTimeout(done,900);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:polygon(-10% -10%,-10% -10%,0% 0%,0% 0%)";ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="polygon(-10% -10%,110% -10%,110% 110%,-10% 110%)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:polygon(110% -10%,110% -10%,100% 0%,100% 0%)";ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="polygon(110% -10%,110% 110%,-10% 110%,-10% -10%)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:inset(100% 0 0 0)";ov.style.transition="clip-path 1s cubic-bezier(.77,0,.18,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="inset(0% 0 0 0)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:inset(0 0 100% 0)";ov.style.transition="clip-path 1s cubic-bezier(.77,0,.18,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="inset(0 0 0% 0)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--accent);opacity:0";ov.style.transition="opacity .18s ease";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.opacity="1"}));setTimeout(()=>{ov.style.background="var(--bg)";ov.style.transition="background .6s ease,opacity .6s ease";},200);setTimeout(done,900);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:polygon(49% 49%,51% 49%,51% 51%,49% 51%)";ov.style.transition="clip-path 1s cubic-bezier(.4,0,.2,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="polygon(0% 0%,100% 0%,100% 100%,0% 100%)"}));setTimeout(done,1050);},
-    (ov,done)=>{ov.style.cssText="position:fixed;inset:0;z-index:8000;pointer-events:none;background:var(--bg);clip-path:inset(0 0 0 100%)";ov.style.transition="clip-path 1s cubic-bezier(.77,0,.18,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.style.clipPath="inset(0 0 0 0%)"}));setTimeout(done,1050);},
   ];
   const OUTRO=[
     ov=>{ov.style.transition="opacity .7s cubic-bezier(.4,0,.6,1),clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.opacity="0";ov.style.clipPath="circle(0% at 50% 50%)"},
@@ -1560,33 +2092,13 @@ function App(){
     ov=>{ov.style.transition="opacity .7s ease,clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.opacity="0";ov.style.clipPath="circle(0% at 100% 100%)"},
     ov=>{ov.style.transition="transform .8s cubic-bezier(.77,0,.18,1)";ov.style.transform="translateX(100%)"},
     ov=>{ov.style.transition="transform .8s cubic-bezier(.77,0,.18,1)";ov.style.transform="translateX(-100%)"},
-    ov=>{ov.style.transition="transform .8s cubic-bezier(.77,0,.18,1)";ov.style.transform="translateY(100%)"},
-    ov=>{ov.style.transition="transform .8s cubic-bezier(.77,0,.18,1)";ov.style.transform="translateY(-100%)"},
     ov=>{ov.style.transition="opacity .7s ease";ov.style.opacity="0"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="polygon(50% 50%,50% 50%,50% 50%,50% 50%)"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="inset(0 50% 0 50%)"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="inset(50% 0 50% 0)"},
-    ov=>{ov.style.transition="opacity .7s ease,transform .7s ease";ov.style.opacity="0";ov.style.transform="scale(1.08)"},
-    ov=>{ov.style.transition="opacity .7s ease,transform .7s ease";ov.style.opacity="0";ov.style.transform="scale(.94)"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="polygon(110% 110%,110% 110%,100% 100%,100% 100%)"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="polygon(-10% 110%,-10% 110%,0% 100%,0% 100%)"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="inset(100% 0 0 0)"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="inset(0 0 100% 0)"},
-    ov=>{ov.style.transition="opacity .6s ease";ov.style.opacity="0"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="polygon(49% 49%,51% 49%,51% 51%,49% 51%)"},
-    ov=>{ov.style.transition="clip-path .7s cubic-bezier(.4,0,.6,1)";ov.style.clipPath="inset(0 100% 0 0)"},
   ];
 
   const nav=dest=>{
     if(transiting||dest===visPage) return;
     setTransiting(true);
-    let idx;
-    if(dest==="detail"&&novel){
-      const ni=(novels||[]).findIndex(n=>n.id===novel.id);
-      idx=ni>=0?ni%TRANSITIONS.length:0;
-    } else {
-      idx=Math.floor(Math.random()*TRANSITIONS.length);
-    }
+    const idx=Math.floor(Math.random()*TRANSITIONS.length);
     const ov=document.createElement("div");
     document.body.appendChild(ov);
     TRANSITIONS[idx](ov,()=>{
@@ -1604,10 +2116,10 @@ function App(){
   const openChapter=id=>{ setChapterId(id); nav("reading"); };
   const liveNovel=novel?novels.find(n=>n.id===novel.id)||novel:null;
 
-  // タブタイトル
   useEffect(()=>{
-    const base=site.name||"文藻";
+    const base=site.name||"淵";
     if(page==="home") document.title=base;
+    else if(page==="gallery") document.title=`ギャラリー — ${base}`;
     else if(page==="hitorigoto") document.title=`ひとりごと — ${base}`;
     else if(page==="profile") document.title=`著者プロフィール — ${base}`;
     else if(page==="detail"&&liveNovel) document.title=`${liveNovel.title} — ${base}`;
@@ -1617,12 +2129,11 @@ function App(){
     }
   },[page,liveNovel,chapterId,site.name]);
 
-  // ファビコン
   useEffect(()=>{
     let href;
     if(author.icon){ href=author.icon; }
     else{
-      const l=(site.name||"文").charAt(0);
+      const l=(site.name||"淵").charAt(0);
       const a=site.theme?.accent||"#c8a86a"; const b=site.theme?.bg||"#07070f";
       const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="${b}"/><text x="32" y="46" font-size="36" text-anchor="middle" fill="${a}" font-family="serif">${l}</text></svg>`;
       href=`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
@@ -1632,7 +2143,6 @@ function App(){
     link.href=href;
   },[author.icon,site.name,site.theme?.accent,site.theme?.bg]);
 
-  // ロゴ5連打でログイン
   const clicks=useRef(0); const timer=useRef(null);
   const handleLogoClick=()=>{
     clicks.current+=1; clearTimeout(timer.current);
@@ -1647,7 +2157,7 @@ function App(){
         <BgTextLayer novels={novels}/>
         {loading&&(
           <div style={{position:"fixed",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"var(--bg)",zIndex:9000,gap:20}}>
-            <div style={{fontFamily:"var(--serif)",fontSize:32,color:"var(--accent)",letterSpacing:"0.12em"}}>{site.name||"文藻"}</div>
+            <div style={{fontFamily:"var(--serif)",fontSize:32,color:"var(--accent)",letterSpacing:"0.12em"}}>{site.name||"淵"}</div>
             <div style={{width:40,height:2,background:"var(--border)",position:"relative",overflow:"hidden"}}>
               <div style={{position:"absolute",inset:0,background:"var(--accent)",animation:"loadbar 1.2s ease infinite"}}/>
             </div>
@@ -1659,20 +2169,23 @@ function App(){
             <div style={{fontSize:32}}>🔥</div>
             <div style={{fontFamily:"var(--serif)",fontSize:22,color:"var(--txt)"}}>Firebase接続エラー</div>
             <div style={{fontSize:13,color:"var(--txt3)",maxWidth:480,textAlign:"center",lineHeight:1.9}}>{dbError}</div>
-            <div style={{fontSize:12,color:"var(--txt3)",maxWidth:480,textAlign:"center",lineHeight:2,marginTop:8,border:"1px solid var(--border)",padding:"16px 20px",borderRadius:3}}>
-              <b style={{color:"var(--txt2)"}}>設定手順：</b><br/>
-              1. <a href="https://console.firebase.google.com/" target="_blank" style={{color:"var(--accent)"}}>Firebase Console</a> でプロジェクトを作成<br/>
-              2. Firestore Database を有効化（テストモードで開始）<br/>
-              3. Storage を有効化<br/>
-              4. プロジェクト設定 → ウェブアプリを追加 → 設定値をコピー<br/>
-              5. このHTMLの <code style={{background:"var(--surface)",padding:"1px 5px"}}>FIREBASE_CONFIG</code> を書き換えて保存
-            </div>
           </div>
         )}
-        {!loading&&!dbError&&!adminOpen&&page!=="reading"&&(
+
+        {/* ギャラリーは全画面overlay（NAVの上） */}
+        {!loading&&!dbError&&!adminOpen&&page==="gallery"&&(
+          <GalleryPage
+            novels={novels}
+            gallery={gallery}
+            onBack={()=>nav("home")}
+            saveGalleryQuotes={saveGalleryQuotes}
+          />
+        )}
+
+        {!loading&&!dbError&&!adminOpen&&page!=="reading"&&page!=="gallery"&&(
           <Nav page={page} onNav={nav} site={site} onLogoClick={handleLogoClick} lightMode={lightMode} onToggleLight={()=>setLightMode(m=>!m)}/>
         )}
-        {!loading&&!dbError&&!adminOpen&&page==="home"&&<HomePage site={site} novels={novels} onOpen={openNovel}/>}
+        {!loading&&!dbError&&!adminOpen&&page==="home"&&<HomePage site={site} novels={novels} onOpen={openNovel} onGallery={()=>nav("gallery")}/>}
         {!loading&&!dbError&&!adminOpen&&page==="hitorigoto"&&<HitorigotoPage author={author}/>}
         {!loading&&!dbError&&!adminOpen&&page==="detail"&&liveNovel&&<DetailPage novel={liveNovel} onBack={()=>nav("home")} onRead={openChapter} onSendMessage={addMessage}/>}
         {!loading&&!dbError&&!adminOpen&&page==="reading"&&liveNovel&&chapterId&&<ReadingPage novel={liveNovel} chapterId={chapterId} onBack={()=>nav("detail")} onChapter={setChapterId}/>}
